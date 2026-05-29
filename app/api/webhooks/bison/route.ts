@@ -19,9 +19,11 @@ import crypto from 'crypto'
 export async function POST(request: NextRequest) {
   const supabase = createServerClient()
 
+  let rawBody: string
   let body: any
   try {
-    body = await request.json()
+    rawBody = await request.text()
+    body = JSON.parse(rawBody)
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
@@ -32,7 +34,7 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get('x-webhook-signature') || ''
     const expected = crypto
       .createHmac('sha256', settings.webhook_secret)
-      .update(JSON.stringify(body))
+      .update(rawBody)
       .digest('hex')
 
     if (signature !== expected) {
@@ -42,17 +44,26 @@ export async function POST(request: NextRequest) {
 
   // 2. Log raw payload immediately
   const eventType = body?.event?.type || 'UNKNOWN'
-  await supabase.from('webhook_logs').insert({
-    event_type: eventType,
-    bison_instance_url: body?.event?.instance_url || '',
-    bison_workspace_name: body?.event?.workspace_name || '',
-    payload: body,
-    processed: false,
-  })
+  const { data: logRow, error: logError } = await supabase
+    .from('webhook_logs')
+    .insert({
+      event_type: eventType,
+      bison_instance_url: body?.event?.instance_url || '',
+      bison_workspace_name: body?.event?.workspace_name || '',
+      payload: body,
+      processed: false,
+    })
+    .select('id')
+    .single()
+
+  if (logError) {
+    console.error('Failed to write webhook log:', logError)
+  }
+
+  const logId = logRow?.id || null
 
   // 3. Return 200 immediately — process async
-  // Using waitUntil pattern via edge runtime or fire-and-forget
-  processWebhookAsync(body, eventType, settings).catch(console.error)
+  processWebhookAsync(body, eventType, settings, logId).catch(console.error)
 
   return NextResponse.json({ received: true }, { status: 200 })
 }
@@ -60,7 +71,8 @@ export async function POST(request: NextRequest) {
 async function processWebhookAsync(
   body: any,
   eventType: string,
-  settings: Record<string, string>
+  settings: Record<string, string>,
+  logId: string | null
 ) {
   const supabase = createServerClient()
   const data = body?.data
@@ -95,22 +107,22 @@ async function processWebhookAsync(
         break
     }
 
-    // Mark webhook as processed
-    await supabase
-      .from('webhook_logs')
-      .update({ processed: true })
-      .eq('payload->>event->>type', eventType)
-      .order('received_at', { ascending: false })
-      .limit(1)
+    // Mark webhook as processed using primary key id
+    if (logId) {
+      await supabase
+        .from('webhook_logs')
+        .update({ processed: true })
+        .eq('id', logId)
+    }
   } catch (error: any) {
     console.error('Webhook processing error:', error)
-    // Update webhook log with error
-    await supabase
-      .from('webhook_logs')
-      .update({ error_message: error.message })
-      .eq('payload->>event->>type', eventType)
-      .order('received_at', { ascending: false })
-      .limit(1)
+    // Update webhook log with error using primary key id
+    if (logId) {
+      await supabase
+        .from('webhook_logs')
+        .update({ error_message: error.message })
+        .eq('id', logId)
+    }
   }
 }
 

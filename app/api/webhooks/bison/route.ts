@@ -28,9 +28,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  // 1. HMAC verification (if webhook_secret is set)
+  // Check if user is authenticated (allows signature bypass for internal tester tool)
+  const { data: { user } } = await supabase.auth.getUser()
+  const isSimulation = user && request.headers.get('x-test-simulation') === 'true'
+
+  // 1. HMAC verification (if webhook_secret is set and not a dashboard simulation)
   const settings = await getSettings()
-  if (settings.webhook_secret) {
+  if (settings.webhook_secret && !isSimulation) {
     const signature = request.headers.get('x-webhook-signature') || ''
     const expected = crypto
       .createHmac('sha256', settings.webhook_secret)

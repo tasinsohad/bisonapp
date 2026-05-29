@@ -18,6 +18,9 @@ interface ConversationThreadResponse {
   }
 }
 
+// Helper to safely strip trailing slashes to prevent HTTP 404 (e.g. //api/...)
+const getBaseUrl = (url: string) => url.replace(/\/+$/, '')
+
 /**
  * Fetch the full conversation thread for a reply
  * GET {instance_url}/api/replies/{reply_id}/conversation-thread
@@ -28,7 +31,7 @@ export async function getConversationThread(
 ): Promise<ConversationThreadResponse | null> {
   try {
     const response = await fetch(
-      `${opts.instanceUrl}/api/replies/${replyId}/conversation-thread`,
+      `${getBaseUrl(opts.instanceUrl)}/api/replies/${replyId}/conversation-thread`,
       {
         headers: {
           'Authorization': `Bearer ${opts.apiKey}`,
@@ -64,7 +67,7 @@ export async function getLeadReplies(
   if (filters?.campaign_id) params.set('campaign_id', String(filters.campaign_id))
   if (filters?.sender_email_id) params.set('sender_email_id', String(filters.sender_email_id))
 
-  const url = `${opts.instanceUrl}/api/leads/${leadId}/replies${params.toString() ? '?' + params : ''}`
+  const url = `${getBaseUrl(opts.instanceUrl)}/api/leads/${leadId}/replies${params.toString() ? '?' + params : ''}`
 
   try {
     const response = await fetch(url, {
@@ -92,7 +95,7 @@ export async function getLeadSentEmails(
 ): Promise<any[]> {
   try {
     const response = await fetch(
-      `${opts.instanceUrl}/api/leads/${leadIdOrEmail}/sent-emails`,
+      `${getBaseUrl(opts.instanceUrl)}/api/leads/${leadIdOrEmail}/sent-emails`,
       {
         headers: {
           'Authorization': `Bearer ${opts.apiKey}`,
@@ -119,7 +122,7 @@ export async function getLeadDetails(
 ): Promise<any | null> {
   try {
     const response = await fetch(
-      `${opts.instanceUrl}/api/leads/${leadIdOrEmail}`,
+      `${getBaseUrl(opts.instanceUrl)}/api/leads/${leadIdOrEmail}`,
       {
         headers: {
           'Authorization': `Bearer ${opts.apiKey}`,
@@ -154,7 +157,7 @@ export async function updateBisonLead(
 ): Promise<boolean> {
   try {
     const response = await fetch(
-      `${opts.instanceUrl}/api/leads/${leadId}`,
+      `${getBaseUrl(opts.instanceUrl)}/api/leads/${leadId}`,
       {
         method: 'PUT',
         headers: {
@@ -180,7 +183,7 @@ export async function testBisonConnection(
   opts: BisonApiOptions
 ): Promise<{ success: boolean; error?: string; data?: any }> {
   try {
-    const response = await fetch(`${opts.instanceUrl}/api/users`, {
+    const response = await fetch(`${getBaseUrl(opts.instanceUrl)}/api/users`, {
       headers: {
         'Authorization': `Bearer ${opts.apiKey}`,
         'Accept': 'application/json',

@@ -32,21 +32,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const isSimulation = user && request.headers.get('x-test-simulation') === 'true'
 
-  // 1. HMAC verification (if webhook_secret is set and not a dashboard simulation)
-  const settings = await getSettings()
-  if (settings.webhook_secret && !isSimulation) {
-    const signature = request.headers.get('x-webhook-signature') || ''
-    const expected = crypto
-      .createHmac('sha256', settings.webhook_secret)
-      .update(rawBody)
-      .digest('hex')
-
-    if (signature !== expected) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-    }
-  }
-
-  // 2. Log raw payload immediately
+  // 1. Log raw payload immediately (before any verification)
   const eventType = body?.event?.type || 'UNKNOWN'
   const { data: logRow, error: logError } = await supabase
     .from('webhook_logs')
@@ -65,6 +51,26 @@ export async function POST(request: NextRequest) {
   }
 
   const logId = logRow?.id || null
+
+  // 2. HMAC verification (if webhook_secret is set and not a dashboard simulation)
+  const settings = await getSettings()
+  if (settings.webhook_secret && !isSimulation) {
+    const signature = request.headers.get('x-webhook-signature') || ''
+    const expected = crypto
+      .createHmac('sha256', settings.webhook_secret)
+      .update(rawBody)
+      .digest('hex')
+
+    if (signature !== expected) {
+      if (logId) {
+        await supabase
+          .from('webhook_logs')
+          .update({ error_message: 'Invalid HMAC signature. Secret mismatch.' })
+          .eq('id', logId)
+      }
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+  }
 
   // 3. Return 200 immediately — process async
   processWebhookAsync(body, eventType, settings, logId).catch(console.error)

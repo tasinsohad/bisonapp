@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { getSettings } from '@/lib/settings'
 import { calculateNextSendAt, isWithinSendWindow, isWeekend } from '@/lib/followup-scheduler'
-import { runFollowupAgent } from '@/lib/ai'
+import { runFollowupAgent, runAppointmentSetter } from '@/lib/ai'
 import { sendBisonEmail } from '@/lib/send-email'
 import { syncLeadThread } from '@/lib/bison-sync'
 
@@ -18,6 +18,26 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServerClient()
   const settings = await getSettings()
+
+  // 0. Process queued inbound replies
+  const { data: queuedReplies } = await supabase
+    .from('reply_queue')
+    .select('id, lead_id')
+    .eq('status', 'pending')
+    .lte('send_after', new Date().toISOString())
+    
+  if (queuedReplies && queuedReplies.length > 0) {
+    for (const item of queuedReplies) {
+      await supabase.from('reply_queue').update({ status: 'processing', updated_at: new Date().toISOString() }).eq('id', item.id)
+      try {
+        await runAppointmentSetter(item.lead_id)
+        await supabase.from('reply_queue').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', item.id)
+      } catch (err) {
+        console.error(`Failed to process queued reply ${item.id}:`, err)
+        await supabase.from('reply_queue').update({ status: 'pending', updated_at: new Date().toISOString() }).eq('id', item.id)
+      }
+    }
+  }
 
   // 1. Get due enrollments
   const { data: enrollments, error } = await supabase

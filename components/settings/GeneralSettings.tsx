@@ -31,6 +31,18 @@ export function GeneralSettings({ settings, setSettings, onSave }: any) {
             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
           />
         </div>
+
+        <div className="sm:col-span-4 mt-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Inbound Reply Delay (Minutes)</label>
+          <p className="text-xs text-slate-500 mb-2">How long the AI should wait before replying to a prospect. Set to 0 for instant replies. Requires the background Cron to be running.</p>
+          <input
+            type="number"
+            min="0"
+            value={settings.inbound_reply_delay_minutes || '0'}
+            onChange={(e) => setSettings({ ...settings, inbound_reply_delay_minutes: e.target.value })}
+            className="w-full max-w-[120px] px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
       </div>
 
       <div className="pt-2">

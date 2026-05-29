@@ -4,6 +4,7 @@ import { getSettings } from '@/lib/settings'
 import { calculateNextSendAt, isWithinSendWindow, isWeekend } from '@/lib/followup-scheduler'
 import { runFollowupAgent } from '@/lib/ai'
 import { sendBisonEmail } from '@/lib/send-email'
+import { syncLeadThread } from '@/lib/bison-sync'
 
 export async function POST(request: NextRequest) {
   // Validate CRON_SECRET if it exists in env
@@ -64,6 +65,20 @@ export async function POST(request: NextRequest) {
     }
 
     const currentStepConfig = steps[enrollment.current_step - 1]
+
+    // Sync the thread right before sending to ensure no new reply was missed
+    if (lead.bison_reply_id) {
+      try {
+        const syncResult = await syncLeadThread(lead)
+        if (syncResult.success && syncResult.hasNewReply) {
+          // Sync automatically pauses the enrollment in the database.
+          // Skip sending the follow-up.
+          continue
+        }
+      } catch (err) {
+        console.error(`Thread sync failed for lead ${lead.id}:`, err)
+      }
+    }
 
     // c. Guard: check if lead replied recently (if auto pause enabled)
     if (settings.auto_pause_on_reply === 'true') {

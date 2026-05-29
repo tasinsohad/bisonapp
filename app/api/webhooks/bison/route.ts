@@ -339,7 +339,7 @@ async function handleReply(
   }
 
   // ===== TRIGGER OR QUEUE APPOINTMENT SETTER =====
-  const delayMinutes = parseInt(settings.inbound_reply_delay_minutes || '0')
+  const delayMinutes = parseInt(settings.inbound_reply_delay_minutes || '5')
   if (delayMinutes > 0) {
     const sendAfter = new Date(Date.now() + delayMinutes * 60000).toISOString()
     await supabase.from('reply_queue').insert({

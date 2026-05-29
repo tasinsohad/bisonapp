@@ -19,5 +19,5 @@ CREATE POLICY "authenticated_full_access" ON reply_queue FOR ALL USING (true) WI
 
 -- Add default delay setting
 INSERT INTO settings (key, value) VALUES
-  ('inbound_reply_delay_minutes', '0')
+  ('inbound_reply_delay_minutes', '5')
 ON CONFLICT (key) DO NOTHING;

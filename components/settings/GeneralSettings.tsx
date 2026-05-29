@@ -38,7 +38,7 @@ export function GeneralSettings({ settings, setSettings, onSave }: any) {
           <input
             type="number"
             min="0"
-            value={settings.inbound_reply_delay_minutes || '0'}
+            value={settings.inbound_reply_delay_minutes || '5'}
             onChange={(e) => setSettings({ ...settings, inbound_reply_delay_minutes: e.target.value })}
             className="w-full max-w-[120px] px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
           />

@@ -1,0 +1,14 @@
+{
+  "name": "supabase-mcp",
+  "version": "1.0.0",
+  "description": "Supabase MCP server for Antigravity",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.1",
+    "pg": "^8.13.0"
+  }
+}

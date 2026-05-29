@@ -1,0 +1,67 @@
+'use client'
+
+import { Users, Calendar as CalendarIcon, Activity, MessageSquare } from 'lucide-react'
+
+export function StatsCards({ stats }: { stats: any }) {
+  const cards = [
+    {
+      title: 'Total Leads',
+      value: stats?.total_leads || 0,
+      icon: Users,
+      color: 'text-orange-500 bg-orange-50 border-orange-100',
+    },
+    {
+      title: 'Meetings (Month)',
+      value: stats?.meetings_this_month || 0,
+      icon: CalendarIcon,
+      color: 'text-blue-500 bg-blue-50 border-blue-100',
+    },
+    {
+      title: 'Active Follow-ups',
+      value: stats?.active_enrollments || 0,
+      icon: Activity,
+      color: 'text-indigo-500 bg-indigo-50 border-indigo-100',
+    },
+    {
+      title: 'Replies Today',
+      value: stats?.replies_today || 0,
+      icon: MessageSquare,
+      color: 'text-emerald-500 bg-emerald-50 border-emerald-100',
+    },
+  ]
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {cards.map((card, idx) => {
+        const Icon = card.icon
+        return (
+          <div 
+            key={idx} 
+            className="bg-white rounded-[24px] border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.012)] p-6 flex flex-col justify-between hover:shadow-[0_12px_40px_rgba(0,0,0,0.025)] transition-all duration-300"
+          >
+            <div className="flex justify-between items-start">
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                  {card.title}
+                </span>
+                <span className="text-4xl font-extrabold tracking-tight text-slate-950 block">
+                  {card.value}
+                </span>
+              </div>
+              <div className={`p-3 rounded-2xl border ${card.color} flex items-center justify-center`}>
+                <Icon className="w-5 h-5" />
+              </div>
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-slate-50 flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Live updates active
+              </span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}

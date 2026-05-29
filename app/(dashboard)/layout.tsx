@@ -32,7 +32,6 @@ export default function DashboardLayout({
       try {
         // Ping the background endpoints silently
         await fetch('/api/cron/process-followups', { method: 'POST' })
-        await fetch('/api/cron/sync-threads', { method: 'POST' })
       } catch (err) {
         console.error('Internal heartbeat failed:', err)
       }

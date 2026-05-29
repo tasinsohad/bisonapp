@@ -8,8 +8,8 @@ export function PromptsSettings({ settings, setSettings, onSave }: any) {
     if(confirm('Are you sure you want to reset to default prompts?')) {
       setSettings({
         ...settings,
-        system_prompt_setter: 'You are an AI sales assistant...', // Truncated for brevity, normally you'd put the default here
-        system_prompt_followup: 'You are an AI sales assistant...'
+        appt_setter_system_prompt: 'You are an AI sales assistant...', // Truncated for brevity, normally you'd put the default here
+        followup_agent_system_prompt: 'You are an AI sales assistant...'
       })
     }
   }
@@ -33,8 +33,8 @@ export function PromptsSettings({ settings, setSettings, onSave }: any) {
             Available variables: {'{{lead.first_name}}'}, {'{{lead.company}}'}, {'{{calendar_link}}'}, {'{{bison_sender_email_name}}'}
           </div>
           <textarea
-            value={settings.system_prompt_setter || ''}
-            onChange={(e) => setSettings({ ...settings, system_prompt_setter: e.target.value })}
+            value={settings.appt_setter_system_prompt || ''}
+            onChange={(e) => setSettings({ ...settings, appt_setter_system_prompt: e.target.value })}
             rows={10}
             className="w-full px-4 py-3 font-mono text-sm bg-slate-900 text-slate-300 rounded-b-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
@@ -43,8 +43,8 @@ export function PromptsSettings({ settings, setSettings, onSave }: any) {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">Follow-up Agent Prompt</label>
           <textarea
-            value={settings.system_prompt_followup || ''}
-            onChange={(e) => setSettings({ ...settings, system_prompt_followup: e.target.value })}
+            value={settings.followup_agent_system_prompt || ''}
+            onChange={(e) => setSettings({ ...settings, followup_agent_system_prompt: e.target.value })}
             rows={8}
             className="w-full px-4 py-3 font-mono text-sm bg-slate-900 text-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />

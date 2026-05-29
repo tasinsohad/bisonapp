@@ -5,7 +5,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { BisonSenderChip } from '@/components/shared/BisonSenderChip'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
-import { Search, Filter, Download, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Filter, Download, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
 
 export default function LeadsPage() {
@@ -42,6 +42,25 @@ export default function LeadsPage() {
       toast(e.message, 'error')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteLead = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this lead? This action cannot be undone and will erase all associated conversations and logs.')) return;
+    
+    try {
+      const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast('Lead deleted successfully', 'success');
+        fetchLeads();
+      } else {
+        const data = await res.json();
+        toast(data.error || 'Failed to delete lead', 'error');
+      }
+    } catch (err: any) {
+      toast(err.message, 'error');
     }
   }
 
@@ -124,6 +143,7 @@ export default function LeadsPage() {
                   <th className="px-6 py-3 font-medium hidden md:table-cell">Sender</th>
                   <th className="px-6 py-3 font-medium hidden lg:table-cell">Campaign</th>
                   <th className="px-6 py-3 font-medium">Last Activity</th>
+                  <th className="px-6 py-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -155,6 +175,15 @@ export default function LeadsPage() {
                       <Link href={`/leads/${lead.id}`} className="block">
                         {lead.last_activity_at ? formatDistanceToNow(new Date(lead.last_activity_at), { addSuffix: true }) : '-'}
                       </Link>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={(e) => handleDeleteLead(lead.id, e)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Delete Lead"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}

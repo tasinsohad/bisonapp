@@ -98,34 +98,34 @@ export default function LoginPage() {
       <div className="w-full md:w-1/2 flex items-center justify-center p-6 md:p-12 bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-50 relative overflow-hidden">
         
         {/* INTERACTIVE BACKGROUND PARALLAX EFFECTS */}
-        <div className="absolute inset-0 pointer-events-none transition-transform duration-300 ease-out">
+        <div className="absolute inset-0 pointer-events-none">
           <div 
-            className="absolute top-[10%] left-[20%] w-[450px] h-[450px] bg-blue-300 rounded-full filter blur-[100px] opacity-40 animate-pulse transition-transform duration-500 ease-out" 
+            className="absolute top-[10%] left-[20%] w-[450px] h-[450px] bg-blue-300 rounded-full filter blur-[100px] opacity-40 animate-pulse transition-transform duration-75 ease-out" 
             style={{ 
               animationDuration: '8s',
-              transform: `translate(${mousePos.x * -40}px, ${mousePos.y * -40}px)`
+              transform: `translate(${mousePos.x * -100}px, ${mousePos.y * -100}px)`
             }}
           ></div>
           <div 
-            className="absolute bottom-[10%] right-[10%] w-[350px] h-[350px] bg-indigo-300 rounded-full filter blur-[80px] opacity-30 animate-pulse transition-transform duration-700 ease-out" 
+            className="absolute bottom-[10%] right-[10%] w-[350px] h-[350px] bg-indigo-300 rounded-full filter blur-[80px] opacity-30 animate-pulse transition-transform duration-75 ease-out" 
             style={{ 
               animationDuration: '6s', 
               animationDelay: '1s',
-              transform: `translate(${mousePos.x * 50}px, ${mousePos.y * 50}px)`
+              transform: `translate(${mousePos.x * 120}px, ${mousePos.y * 120}px)`
             }}
           ></div>
           <div 
-            className="absolute top-[40%] right-[30%] w-[180px] h-[180px] bg-white rounded-full filter blur-[40px] opacity-60 transition-transform duration-300 ease-out"
+            className="absolute top-[40%] right-[30%] w-[180px] h-[180px] bg-white rounded-full filter blur-[40px] opacity-60 transition-transform duration-75 ease-out"
             style={{
-              transform: `translate(${mousePos.x * -80}px, ${mousePos.y * -80}px)`
+              transform: `translate(${mousePos.x * -160}px, ${mousePos.y * -160}px)`
             }}
           ></div>
         </div>
 
         {/* FROSTED GLASS LOGIN CARD */}
         <div 
-          className="w-full max-w-md p-8 md:p-10 rounded-[32px] bg-white/40 border border-white/45 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.06)] backdrop-blur-2xl relative z-10 animate-fade-in flex flex-col items-center transition-transform duration-700 hover:shadow-[0_40px_80px_-16px_rgba(0,0,0,0.1)]"
-          style={{ transform: `perspective(1000px) rotateX(${mousePos.y * 2}deg) rotateY(${mousePos.x * -2}deg)` }}
+          className="w-full max-w-md p-8 md:p-10 rounded-[32px] bg-white/40 border border-white/45 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.06)] backdrop-blur-2xl relative z-10 animate-fade-in flex flex-col items-center hover:shadow-[0_40px_80px_-16px_rgba(0,0,0,0.1)] transition-transform duration-75 ease-out"
+          style={{ transform: `perspective(1000px) rotateX(${mousePos.y * -8}deg) rotateY(${mousePos.x * 8}deg)` }}
         >
           <div className="text-center w-full mb-8">
             <h2 className="text-3xl font-bold text-slate-900 mb-1.5 transition-colors">{isSignUp ? 'Join Us!' : 'Hello!'}</h2>

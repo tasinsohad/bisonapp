@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
 import { MessageSquare, UserPlus, Send, CalendarCheck, Clock, FileEdit, AlertCircle, Activity } from 'lucide-react'
+import Link from 'next/link'
 
 export function ActivityFeed() {
   const [activities, setActivities] = useState<any[]>([])
@@ -58,20 +59,22 @@ export function ActivityFeed() {
           <div className="text-center text-xs font-bold text-slate-400 py-10 uppercase tracking-wider">No recent activity</div>
         ) : (
           activities.map((activity) => (
-            <div key={activity.id} className="flex gap-4 animate-slide-in-right">
-              <div className="mt-1 flex-shrink-0 w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100/50">
-                {getIcon(activity.event_type)}
+            <Link href={`/leads/${activity.lead_id}`} key={activity.id} className="block hover:bg-slate-50 p-2 -mx-2 rounded-xl transition-colors cursor-pointer group">
+              <div className="flex gap-4 animate-slide-in-right">
+                <div className="mt-1 flex-shrink-0 w-8 h-8 rounded-full bg-white group-hover:bg-indigo-50 flex items-center justify-center border border-slate-100/50 shadow-sm transition-colors">
+                  {getIcon(activity.event_type)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-extrabold text-slate-900 truncate group-hover:text-indigo-600 transition-colors">
+                    {activity.lead_name || activity.lead_email || 'Unknown Lead'}
+                  </p>
+                  <p className="text-xs font-medium text-slate-500 truncate">{activity.description}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+                    {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
+                  </p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-extrabold text-slate-900 truncate">
-                  {activity.lead_name || activity.lead_email || 'Unknown Lead'}
-                </p>
-                <p className="text-xs font-medium text-slate-500 truncate">{activity.description}</p>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
-                  {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
-                </p>
-              </div>
-            </div>
+            </Link>
           ))
         )}
       </div>

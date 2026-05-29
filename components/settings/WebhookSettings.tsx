@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Save, Copy, Check, Terminal, Play, RefreshCw, AlertCircle, Eye, X } from 'lucide-react'
+import { Save, Copy, Check, Terminal, Play, RefreshCw, AlertCircle, Eye, X, Wifi, WifiOff, Code } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export function WebhookSettings({ settings, setSettings, onSave }: any) {
@@ -12,6 +12,11 @@ export function WebhookSettings({ settings, setSettings, onSave }: any) {
   const [loadingLogs, setLoadingLogs] = useState(false)
   const [selectedPayload, setSelectedPayload] = useState<any>(null)
   
+  // Realtime live capture state
+  const [isListening, setIsListening] = useState(false)
+  const [justCapturedId, setJustCapturedId] = useState<string | null>(null)
+  const [copiedCurl, setCopiedCurl] = useState(false)
+
   // Custom mock tester state
   const [testLeadName, setTestLeadName] = useState('John Doe')
   const [testLeadEmail, setTestLeadEmail] = useState('john.doe@company.com')
@@ -27,13 +32,45 @@ export function WebhookSettings({ settings, setSettings, onSave }: any) {
     fetchLogs()
   }, [])
 
-  // Auto-refresh logs
+  // 📡 n8n-Style WebSocket Live listener
   useEffect(() => {
-    const timer = setInterval(() => {
-      fetchLogs()
-    }, 6000)
-    return () => clearInterval(timer)
-  }, [])
+    if (!isListening) return
+
+    console.log('📡 Starting live realtime listener for webhook_logs...')
+
+    const channel = supabase
+      .channel('live_webhook_stream')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'webhook_logs'
+        },
+        (payload: any) => {
+          const newLog = payload.new
+          console.log('🎉 Realtime Webhook Captured!', newLog)
+          
+          // Prepend to logs
+          setLogs((prev) => [newLog, ...prev])
+          
+          // Trigger a beautiful visual pop and glow
+          setJustCapturedId(newLog.id)
+          setSelectedPayload(newLog.payload)
+          
+          // Clear the glowing effect after 4 seconds
+          setTimeout(() => {
+            setJustCapturedId(null)
+          }, 4000)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      console.log('🔌 Shutting down live realtime listener...')
+      supabase.removeChannel(channel)
+    }
+  }, [isListening])
 
   const fetchLogs = async () => {
     setLoadingLogs(true)
@@ -62,6 +99,56 @@ export function WebhookSettings({ settings, setSettings, onSave }: any) {
       secret += chars.charAt(Math.floor(Math.random() * chars.length))
     }
     setSettings({ ...settings, webhook_secret: secret })
+  }
+
+  // Auto-generate test cURL command
+  const curlCommand = `curl -X POST "${webhookUrl}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "event": {
+      "type": "${testEventType}",
+      "instance_url": "https://bison-instance.emailbison.com",
+      "workspace_name": "Production Workspace",
+      "timestamp": "${new Date().toISOString()}"
+    },
+    "data": {
+      "lead": {
+        "id": 99281,
+        "email": "${testLeadEmail}",
+        "first_name": "${testLeadName.split(' ')[0]}",
+        "last_name": "${testLeadName.split(' ').slice(1).join(' ') || 'Doe'}",
+        "company": "Acme Corp",
+        "title": "Director of Growth",
+        "custom_variables": [
+          {"name": "website", "value": "https://acme-corp.com"},
+          {"name": "industry", "value": "SaaS"}
+        ]
+      },
+      "reply": {
+        "id": 883921,
+        "text_body": "${testBody.replace(/"/g, '\\"')}",
+        "html_body": "<p>${testBody.replace(/"/g, '\\"')}</p>",
+        "email_subject": "Re: inquiry",
+        "date_received": "${new Date().toISOString()}",
+        "from_name": "${testLeadName}",
+        "from_email_address": "${testLeadEmail}"
+      },
+      "sender_email": {
+        "id": 42,
+        "name": "Sarah Bennett",
+        "email": "sarah@leadpilotoutbound.com"
+      },
+      "campaign": {
+        "id": 777,
+        "name": "Global Enterprise SaaS Campaign"
+      }
+    }
+  }'`
+
+  const copyCurl = () => {
+    navigator.clipboard.writeText(curlCommand)
+    setCopiedCurl(true)
+    setTimeout(() => setCopiedCurl(false), 2000)
   }
 
   const triggerTestWebhook = async () => {
@@ -123,6 +210,7 @@ export function WebhookSettings({ settings, setSettings, onSave }: any) {
 
       if (response.ok) {
         setTestStatus('success')
+        // Logs are loaded immediately by the WebSocket or short-fallback
         setTimeout(() => {
           fetchLogs()
         }, 1000)
@@ -203,13 +291,54 @@ export function WebhookSettings({ settings, setSettings, onSave }: any) {
 
       {/* 3. Interactive Webhook Tester Panel */}
       <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-[0_8px_30px_rgba(0,0,0,0.01)] space-y-5">
-        <div className="flex items-center gap-2 border-b border-slate-50 pb-3">
-          <Terminal className="w-5 h-5 text-blue-600" />
-          <h4 className="font-extrabold text-sm text-slate-950 uppercase tracking-wider">Webhook Tester Simulator</h4>
+        <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+          <div className="flex items-center gap-2">
+            <Terminal className="w-5 h-5 text-blue-600" />
+            <h4 className="font-extrabold text-sm text-slate-950 uppercase tracking-wider">Webhook Tester & Live cURL</h4>
+          </div>
+          
+          {/* n8n-style Listener Activator */}
+          <button
+            onClick={() => setIsListening(!isListening)}
+            className={`flex items-center px-4 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all shadow-sm ${
+              isListening
+                ? 'bg-emerald-500 text-white animate-pulse'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {isListening ? (
+              <>
+                <Wifi className="w-3.5 h-3.5 mr-1.5 animate-bounce" />
+                Listening Live (n8n mode)
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-3.5 h-3.5 mr-1.5" />
+                Start Live Listener
+              </>
+            )}
+          </button>
         </div>
-        <p className="text-xs text-slate-500 leading-relaxed">
-          Simulate a production-level incoming Email Bison webhook payload. This will instantly trigger database lead-matching, contact logs insertion, and the AI appointment setter pipeline.
-        </p>
+
+        {isListening ? (
+          <div className="border border-dashed border-emerald-300 bg-emerald-50/20 rounded-2xl p-5 text-center space-y-3 relative overflow-hidden">
+            <div className="absolute top-2 right-2 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </div>
+            
+            <p className="text-xs font-bold text-slate-700">
+              📡 Active & Intercepting: Waiting for incoming webhook events...
+            </p>
+            <p className="text-[10px] text-slate-400">
+              Trigger your external webhook integration now, or run the custom cURL command below in your terminal!
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Send test parameters locally or click the **Start Live Listener** toggle to visually intercept external production webhooks from Bison or cURL triggers in real-time.
+          </p>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50">
           <div className="space-y-1">
@@ -254,19 +383,39 @@ export function WebhookSettings({ settings, setSettings, onSave }: any) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* 💻 cURL command generator card */}
+        <div className="bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-inner space-y-1">
+          <div className="bg-slate-900 px-4 py-2 border-b border-slate-800 flex justify-between items-center text-[10px] text-slate-400 font-extrabold tracking-wider uppercase">
+            <span className="flex items-center gap-1.5">
+              <Code className="w-3.5 h-3.5 text-blue-400" />
+              Direct Terminal Webhook Test (cURL)
+            </span>
+            <button 
+              onClick={copyCurl}
+              className="hover:text-white transition-colors flex items-center gap-1"
+            >
+              {copiedCurl ? <Check className="w-3 h-3 text-emerald-400 animate-pulse" /> : <Copy className="w-3 h-3" />}
+              {copiedCurl ? 'Copied' : 'Copy cURL'}
+            </button>
+          </div>
+          <div className="p-4 overflow-x-auto text-[10px] font-mono text-slate-300 whitespace-pre">
+            {curlCommand}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
           <button
             onClick={triggerTestWebhook}
             disabled={triggeringTest}
             className="flex items-center py-2.5 px-5 text-xs font-extrabold rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
           >
             <Play className="w-3.5 h-3.5 mr-2" /> 
-            {triggeringTest ? 'Sending Webhook...' : 'Fire Test Payload'}
+            {triggeringTest ? 'Sending Webhook...' : 'Fire Mock Test'}
           </button>
           
           {testStatus === 'success' && (
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg flex items-center">
-              <Check className="w-3.5 h-3.5 mr-1" /> Webhook Received Successfully!
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg flex items-center animate-bounce">
+              <Check className="w-3.5 h-3.5 mr-1" /> Webhook Sent & Captured!
             </span>
           )}
           {testStatus && testStatus.startsWith('error') && (
@@ -310,51 +459,61 @@ export function WebhookSettings({ settings, setSettings, onSave }: any) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 bg-white">
-                {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50/50 transition-all text-xs">
-                    <td className="px-4 py-3 font-semibold text-slate-500 whitespace-nowrap">
-                      {new Date(log.received_at).toLocaleTimeString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-md text-[9px] font-extrabold ${
-                        log.event_type.includes('REPLIED') || log.event_type.includes('INTERESTED') 
-                          ? 'bg-blue-50 text-blue-700' 
-                          : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {log.event_type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-bold text-slate-700 truncate max-w-[150px]">
-                      {log.bison_workspace_name || 'Bison Webhook'}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {log.processed ? (
-                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[9px] font-bold rounded-lg border border-emerald-100 inline-flex items-center">
-                          Processed
+                {logs.map((log) => {
+                  const isJustCaptured = log.id === justCapturedId
+                  return (
+                    <tr 
+                      key={log.id} 
+                      className={`transition-all text-xs duration-500 ${
+                        isJustCaptured 
+                          ? 'bg-emerald-50/70 border-l-4 border-emerald-500' 
+                          : 'hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <td className={`px-4 py-3 font-semibold whitespace-nowrap ${isJustCaptured ? 'text-emerald-700 font-bold' : 'text-slate-500'}`}>
+                        {new Date(log.received_at).toLocaleTimeString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-md text-[9px] font-extrabold ${
+                          log.event_type.includes('REPLIED') || log.event_type.includes('INTERESTED') 
+                            ? 'bg-blue-50 text-blue-700' 
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {log.event_type}
                         </span>
-                      ) : log.error_message ? (
-                        <span 
-                          className="px-2.5 py-1 bg-rose-50 text-rose-700 text-[9px] font-bold rounded-lg border border-rose-100 inline-flex items-center cursor-help"
-                          title={log.error_message}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-slate-700 truncate max-w-[150px]">
+                        {log.bison_workspace_name || 'Bison Webhook'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {log.processed ? (
+                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[9px] font-bold rounded-lg border border-emerald-100 inline-flex items-center">
+                            Processed
+                          </span>
+                        ) : log.error_message ? (
+                          <span 
+                            className="px-2.5 py-1 bg-rose-50 text-rose-700 text-[9px] font-bold rounded-lg border border-rose-100 inline-flex items-center cursor-help"
+                            title={log.error_message}
+                          >
+                            Failed: {log.error_message.substring(0, 15)}...
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-[9px] font-bold rounded-lg border border-amber-100 inline-flex items-center">
+                            Received
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <button
+                          onClick={() => setSelectedPayload(log.payload)}
+                          className="text-slate-500 hover:text-slate-900 border border-slate-200 rounded-lg p-1.5 hover:bg-slate-100 transition-all inline-flex items-center"
                         >
-                          Failed: {log.error_message.substring(0, 15)}...
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-[9px] font-bold rounded-lg border border-amber-100 inline-flex items-center">
-                          Received
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <button
-                        onClick={() => setSelectedPayload(log.payload)}
-                        className="text-slate-500 hover:text-slate-900 border border-slate-200 rounded-lg p-1.5 hover:bg-slate-100 transition-all inline-flex items-center"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

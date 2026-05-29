@@ -188,6 +188,7 @@ ALTER publication supabase_realtime ADD TABLE activity_feed;
 ALTER publication supabase_realtime ADD TABLE leads;
 ALTER publication supabase_realtime ADD TABLE meetings;
 ALTER publication supabase_realtime ADD TABLE followup_enrollments;
+ALTER publication supabase_realtime ADD TABLE webhook_logs;
 
 -- ============================================================
 -- Seed Data

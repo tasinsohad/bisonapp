@@ -26,6 +26,30 @@ export default function DashboardLayout({
     checkUser()
   }, [router, supabase])
 
+  // Dashboard Heartbeat (Internal Cron Replacement for Hobby Tier)
+  useEffect(() => {
+    const runCrons = async () => {
+      try {
+        // Ping the background endpoints silently
+        await fetch('/api/cron/process-followups', { method: 'POST' })
+        await fetch('/api/cron/sync-threads', { method: 'POST' })
+      } catch (err) {
+        console.error('Internal heartbeat failed:', err)
+      }
+    }
+
+    // Delay the first run by 5 seconds to not block initial render
+    const initialTimeout = setTimeout(runCrons, 5000)
+    
+    // Run every 15 minutes (900,000 ms) while the dashboard is open
+    const intervalId = setInterval(runCrons, 900000)
+    
+    return () => {
+      clearTimeout(initialTimeout)
+      clearInterval(intervalId)
+    }
+  }, [])
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>
   }

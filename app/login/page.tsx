@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
@@ -12,9 +12,26 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      // Normalize mouse coordinates between -1 and 1
+      const x = (e.clientX / window.innerWidth - 0.5) * 2
+      const y = (e.clientY / window.innerHeight - 0.5) * 2
+      
+      // Use requestAnimationFrame for smoother performance
+      requestAnimationFrame(() => {
+        setMousePos({ x, y })
+      })
+    }
+    
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,7 +66,7 @@ export default function LoginPage() {
     <div className="min-h-screen w-full flex flex-col md:flex-row bg-[#ffffff] font-sans antialiased overflow-hidden">
       {/* LEFT COLUMN: Clean Minimalist Brand Accent */}
       <div className="w-full md:w-1/2 flex flex-col justify-between p-8 md:p-16 bg-white z-10 relative">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 transform transition-transform duration-700 hover:scale-105 origin-left">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
             L
           </div>
@@ -57,40 +74,62 @@ export default function LoginPage() {
         </div>
 
         <div className="my-auto py-12 md:py-0 max-w-xl">
-          <div className="inline-block border-b-4 border-blue-600 pb-2 mb-6">
+          <div className="inline-block border-b-4 border-blue-600 pb-2 mb-6 transform transition-all duration-1000 ease-out translate-y-0 opacity-100 animate-fade-in" style={{ animationDuration: '0.5s' }}>
             <span className="text-4xl md:text-5xl font-black tracking-tight text-slate-950">AI</span>
           </div>
           
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-slate-950 leading-[1.1] mb-6">
+          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-slate-950 leading-[1.1] mb-6 animate-fade-in" style={{ animationDuration: '0.8s' }}>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Sales Automation</span>
             <br />
             that Mixes Creativity with Convenience
           </h1>
           
-          <p className="text-lg text-slate-500 font-medium max-w-md leading-relaxed">
+          <p className="text-lg text-slate-500 font-medium max-w-md leading-relaxed animate-fade-in" style={{ animationDuration: '1.1s' }}>
             Supercharge your warm booking pipeline with multi-provider AI agents, dynamic enrichment, and automated workflows.
           </p>
         </div>
 
-        <div className="text-xs text-slate-400 font-medium">
+        <div className="text-xs text-slate-400 font-medium animate-fade-in" style={{ animationDuration: '1.5s' }}>
           &copy; {new Date().getFullYear()} LeadPilot Inc. All rights reserved.
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Modern Soft Gradient with Floating Frosted Glass Card */}
-      <div className="w-full md:w-1/2 flex items-center justify-center p-6 md:p-12 bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-50 relative">
-        {/* Soft Background Blur Circles */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-[10%] left-[20%] w-[450px] h-[450px] bg-blue-300 rounded-full filter blur-[100px] opacity-40 animate-pulse" style={{ animationDuration: '8s' }}></div>
-          <div className="absolute bottom-[10%] right-[10%] w-[350px] h-[350px] bg-indigo-300 rounded-full filter blur-[80px] opacity-30 animate-pulse" style={{ animationDuration: '6s', animationDelay: '1s' }}></div>
-          <div className="absolute top-[40%] right-[30%] w-[180px] h-[180px] bg-white rounded-full filter blur-[40px] opacity-60"></div>
+      {/* RIGHT COLUMN: Modern Soft Gradient with Floating Interactive Orbs */}
+      <div className="w-full md:w-1/2 flex items-center justify-center p-6 md:p-12 bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-50 relative overflow-hidden">
+        
+        {/* INTERACTIVE BACKGROUND PARALLAX EFFECTS */}
+        <div className="absolute inset-0 pointer-events-none transition-transform duration-300 ease-out">
+          <div 
+            className="absolute top-[10%] left-[20%] w-[450px] h-[450px] bg-blue-300 rounded-full filter blur-[100px] opacity-40 animate-pulse transition-transform duration-500 ease-out" 
+            style={{ 
+              animationDuration: '8s',
+              transform: `translate(${mousePos.x * -40}px, ${mousePos.y * -40}px)`
+            }}
+          ></div>
+          <div 
+            className="absolute bottom-[10%] right-[10%] w-[350px] h-[350px] bg-indigo-300 rounded-full filter blur-[80px] opacity-30 animate-pulse transition-transform duration-700 ease-out" 
+            style={{ 
+              animationDuration: '6s', 
+              animationDelay: '1s',
+              transform: `translate(${mousePos.x * 50}px, ${mousePos.y * 50}px)`
+            }}
+          ></div>
+          <div 
+            className="absolute top-[40%] right-[30%] w-[180px] h-[180px] bg-white rounded-full filter blur-[40px] opacity-60 transition-transform duration-300 ease-out"
+            style={{
+              transform: `translate(${mousePos.x * -80}px, ${mousePos.y * -80}px)`
+            }}
+          ></div>
         </div>
 
         {/* FROSTED GLASS LOGIN CARD */}
-        <div className="w-full max-w-md p-8 md:p-10 rounded-[32px] bg-white/40 border border-white/45 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.06)] backdrop-blur-2xl relative z-10 animate-fade-in flex flex-col items-center">
+        <div 
+          className="w-full max-w-md p-8 md:p-10 rounded-[32px] bg-white/40 border border-white/45 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.06)] backdrop-blur-2xl relative z-10 animate-fade-in flex flex-col items-center transition-transform duration-700 hover:shadow-[0_40px_80px_-16px_rgba(0,0,0,0.1)]"
+          style={{ transform: `perspective(1000px) rotateX(${mousePos.y * 2}deg) rotateY(${mousePos.x * -2}deg)` }}
+        >
           <div className="text-center w-full mb-8">
-            <h2 className="text-3xl font-bold text-slate-900 mb-1.5">Hello!</h2>
-            <p className="text-slate-500 text-sm font-medium">We are really happy to see you again!</p>
+            <h2 className="text-3xl font-bold text-slate-900 mb-1.5 transition-colors">{isSignUp ? 'Join Us!' : 'Hello!'}</h2>
+            <p className="text-slate-500 text-sm font-medium">{isSignUp ? 'Create a new account to get started.' : 'We are really happy to see you again!'}</p>
           </div>
 
           {error && (
@@ -100,9 +139,9 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleAuth} className="w-full space-y-5">
-            <div>
+            <div className="group">
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
                   <Mail className="h-5 w-5" />
                 </div>
                 <input
@@ -110,15 +149,15 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-11 pr-4 py-3.5 border border-white/60 rounded-2xl bg-white/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-inner text-sm font-medium backdrop-blur-md"
+                  className="block w-full pl-11 pr-4 py-3.5 border border-white/60 rounded-2xl bg-white/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-inner text-sm font-medium backdrop-blur-md hover:bg-white/70"
                   placeholder="Email"
                 />
               </div>
             </div>
 
-            <div>
+            <div className="group">
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
                   <Lock className="h-5 w-5" />
                 </div>
                 <input
@@ -126,7 +165,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-11 pr-11 py-3.5 border border-white/60 rounded-2xl bg-white/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-inner text-sm font-medium backdrop-blur-md"
+                  className="block w-full pl-11 pr-11 py-3.5 border border-white/60 rounded-2xl bg-white/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-inner text-sm font-medium backdrop-blur-md hover:bg-white/70"
                   placeholder="Password"
                 />
                 <button
@@ -142,38 +181,11 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 px-4 border border-transparent rounded-2xl shadow-[0_4px_12px_rgba(59,130,246,0.25)] text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 hover:shadow-[0_6px_20px_rgba(59,130,246,0.35)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-4 px-4 border border-transparent rounded-2xl shadow-[0_4px_12px_rgba(59,130,246,0.25)] text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 hover:shadow-[0_6px_20px_rgba(59,130,246,0.35)] hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
             >
-              {loading ? 'Please wait...' : 'Sign in'}
+              {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign in')}
             </button>
           </form>
-
-          {/* Social Sign In Actions */}
-          <div className="w-full mt-6 text-center">
-            <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold bg-transparent px-2">
-              or sign in with
-            </span>
-            <div className="flex justify-center gap-3 mt-4 w-full">
-              <button type="button" className="flex-1 py-3 border border-white/60 rounded-xl bg-white/50 hover:bg-white/80 transition-all flex items-center justify-center text-slate-600 shadow-sm backdrop-blur-md">
-                <svg className="h-5 w-5 text-[#1877f2]" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
-                </svg>
-              </button>
-              <button type="button" className="flex-1 py-3 border border-white/60 rounded-xl bg-white/50 hover:bg-white/80 transition-all flex items-center justify-center text-slate-600 shadow-sm backdrop-blur-md">
-                <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M21.35,11.1H12v2.7h5.38c-0.24,1.28 -0.96,2.37 -2.04,3.1v2.57h3.3c1.93,-1.78 3.04,-4.4 3.04,-7.47C21.68,11.83 21.56,11.45 21.35,11.1z" fill="#4285F4" />
-                  <path d="M12,20.68c2.61,0 4.81,-0.87 6.41,-2.37l-3.3,-2.57c-0.91,0.61 -2.08,0.98 -3.11,0.98 -2.39,0 -4.42,-1.62 -5.14,-3.8H3.45v2.66C5.07,18.8 8.35,20.68 12,20.68z" fill="#34A853" />
-                  <path d="M6.86,13.09c-0.18,-0.54 -0.28,-1.11 -0.28,-1.7c0,-0.59 0.1,-1.16 0.28,-1.7V7.03H3.45C2.84,8.26 2.5,9.64 2.5,11.09c0,1.45 0.34,2.83 0.95,4.06L6.86,13.09z" fill="#FBBC05" />
-                  <path d="M12,4.82c1.42,0 2.7,0.49 3.71,1.45L17.8,4.19C16.21,2.7 14,1.82 12,1.82c-3.65,0 -6.93,1.88 -8.55,4.86l3.41,2.66C7.58,6.44 9.61,4.82 12,4.82z" fill="#EA4335" />
-                </svg>
-              </button>
-              <button type="button" className="flex-1 py-3 border border-white/60 rounded-xl bg-white/50 hover:bg-white/80 transition-all flex items-center justify-center text-slate-600 shadow-sm backdrop-blur-md">
-                <svg className="h-5 w-5 text-[#0a66c2]" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fillRule="evenodd" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-          </div>
 
           <div className="mt-8 text-center">
             <button
@@ -182,7 +194,7 @@ export default function LoginPage() {
                 setIsSignUp(!isSignUp)
                 setError(null)
               }}
-              className="text-xs text-slate-500 hover:text-slate-800 transition-colors font-semibold"
+              className="text-xs text-slate-500 hover:text-slate-800 transition-colors font-semibold px-4 py-2 hover:bg-slate-100/50 rounded-lg"
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>

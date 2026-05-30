@@ -8,6 +8,7 @@ export default function FollowupsPage() {
   const [sequences, setSequences] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showBuilder, setShowBuilder] = useState(false)
+  const [editingSequence, setEditingSequence] = useState<any>(null)
   const [showBulkEnroll, setShowBulkEnroll] = useState(false)
   
   const { toast } = useToast()
@@ -74,7 +75,7 @@ export default function FollowupsPage() {
             Bulk Enroll
           </button>
           <button 
-            onClick={() => setShowBuilder(true)}
+            onClick={() => { setEditingSequence(null); setShowBuilder(true); }}
             className="px-4 py-2 bg-indigo-600 border border-transparent text-white rounded-lg shadow-sm hover:bg-indigo-700 flex items-center transition-colors"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -96,7 +97,7 @@ export default function FollowupsPage() {
             <h3 className="text-lg font-medium text-slate-800 mb-2">No sequences yet</h3>
             <p className="text-slate-500 max-w-sm mx-auto mb-6">Create a sequence to automate follow-up emails to your leads.</p>
             <button 
-              onClick={() => setShowBuilder(true)}
+              onClick={() => { setEditingSequence(null); setShowBuilder(true); }}
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700 transition-colors mx-auto"
             >
               Create Sequence
@@ -110,7 +111,7 @@ export default function FollowupsPage() {
                   <h3 className="font-semibold text-slate-800 text-lg mb-1">{seq.name}</h3>
                   <div className="flex items-center text-xs text-slate-500 space-x-3">
                     <span className="flex items-center"><Play className="w-3 h-3 mr-1" /> {seq.steps.length} Steps</span>
-                    <span className="flex items-center"><Users className="w-3 h-3 mr-1" /> {seq.enrollments_count} Active</span>
+                    <span className="flex items-center"><Users className="w-3 h-3 mr-1" /> {seq.enrollments_count || 0} Active</span>
                   </div>
                 </div>
                 <div className="relative inline-flex items-center cursor-pointer" onClick={() => toggleActive(seq.id, seq.is_active)}>
@@ -141,7 +142,11 @@ export default function FollowupsPage() {
               </div>
 
               <div className="p-3 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
-                <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Edit">
+                <button 
+                  onClick={() => { setEditingSequence(seq); setShowBuilder(true); }}
+                  className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" 
+                  title="Edit"
+                >
                   <Edit2 className="w-4 h-4" />
                 </button>
                 <button 
@@ -158,7 +163,10 @@ export default function FollowupsPage() {
       </div>
 
       {showBuilder && (
-        <SequenceBuilder onClose={() => { setShowBuilder(false); fetchSequences(); }} />
+        <SequenceBuilder 
+          initialSequence={editingSequence}
+          onClose={() => { setShowBuilder(false); setEditingSequence(null); fetchSequences(); }} 
+        />
       )}
       
       {showBulkEnroll && (
@@ -171,11 +179,13 @@ export default function FollowupsPage() {
   )
 }
 
-function SequenceBuilder({ onClose }: { onClose: () => void }) {
-  const [name, setName] = useState('')
-  const [steps, setSteps] = useState<any[]>([
-    { delay_days: 2, delay_hours: 0, send_on_weekends: false, custom_message: '' }
-  ])
+function SequenceBuilder({ initialSequence, onClose }: { initialSequence?: any, onClose: () => void }) {
+  const [name, setName] = useState(initialSequence?.name || '')
+  const [steps, setSteps] = useState<any[]>(
+    initialSequence?.steps || [
+      { delay_days: 2, delay_hours: 0, send_on_weekends: false, custom_message: '' }
+    ]
+  )
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
 
@@ -183,13 +193,18 @@ function SequenceBuilder({ onClose }: { onClose: () => void }) {
     if (!name.trim()) return toast('Name is required', 'error')
     setSaving(true)
     try {
-      const res = await fetch('/api/followup/sequences', {
-        method: 'POST',
+      const url = initialSequence ? `/api/followup/sequences/${initialSequence.id}` : '/api/followup/sequences'
+      const method = initialSequence ? 'PATCH' : 'POST'
+      
+      const payload = { name, steps, is_active: initialSequence ? initialSequence.is_active : true }
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, steps, is_active: true })
+        body: JSON.stringify(payload)
       })
       if (res.ok) {
-        toast('Sequence created', 'success')
+        toast(initialSequence ? 'Sequence updated' : 'Sequence created', 'success')
         onClose()
       } else {
         const d = await res.json()
@@ -212,7 +227,7 @@ function SequenceBuilder({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-slide-in-up">
         <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-xl">
-          <h2 className="text-xl font-bold text-slate-800">Build Sequence</h2>
+          <h2 className="text-xl font-bold text-slate-800">{initialSequence ? 'Edit Sequence' : 'Build Sequence'}</h2>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200 transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -286,7 +301,7 @@ function SequenceBuilder({ onClose }: { onClose: () => void }) {
         <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50">
-            {saving ? 'Saving...' : 'Save Sequence'}
+            {saving ? 'Saving...' : (initialSequence ? 'Update Sequence' : 'Save Sequence')}
           </button>
         </div>
       </div>

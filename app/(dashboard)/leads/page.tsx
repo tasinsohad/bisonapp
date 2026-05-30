@@ -5,7 +5,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { BisonSenderChip } from '@/components/shared/BisonSenderChip'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
-import { Search, Filter, Download, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { Search, Filter, Download, Plus, ChevronLeft, ChevronRight, Trash2, X, Users } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
 
 export default function LeadsPage() {
@@ -17,6 +17,8 @@ export default function LeadsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   
+  const [showAddModal, setShowAddModal] = useState(false)
+
   const { toast } = useToast()
 
   const fetchLeads = async () => {
@@ -64,6 +66,14 @@ export default function LeadsPage() {
     }
   }
 
+  const handleExport = () => {
+    const params = new URLSearchParams({
+      ...(search ? { search } : {}),
+      ...(statusFilter ? { status: statusFilter } : {})
+    })
+    window.location.href = `/api/leads/export?${params.toString()}`
+  }
+
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchLeads()
@@ -80,11 +90,17 @@ export default function LeadsPage() {
           <p className="text-slate-500">Manage your outreach pipeline.</p>
         </div>
         <div className="flex gap-2">
-          <button className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg shadow-sm hover:bg-slate-50 flex items-center transition-colors">
+          <button 
+            onClick={handleExport}
+            className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg shadow-sm hover:bg-slate-50 flex items-center transition-colors"
+          >
             <Download className="w-4 h-4 mr-2" />
             Export
           </button>
-          <button className="px-4 py-2 bg-indigo-600 border border-transparent text-white rounded-lg shadow-sm hover:bg-indigo-700 flex items-center transition-colors">
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 bg-indigo-600 border border-transparent text-white rounded-lg shadow-sm hover:bg-indigo-700 flex items-center transition-colors"
+          >
             <Plus className="w-4 h-4 mr-2" />
             Add Lead
           </button>
@@ -214,7 +230,135 @@ export default function LeadsPage() {
           </div>
         </div>
       </div>
+      
+      {showAddModal && (
+        <AddLeadModal 
+          onClose={() => setShowAddModal(false)} 
+          onSuccess={() => { setShowAddModal(false); fetchLeads(); }} 
+        />
+      )}
     </div>
   )
 }
-import { Users } from 'lucide-react'
+
+function AddLeadModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: () => void }) {
+  const [formData, setFormData] = useState({
+    email: '',
+    first_name: '',
+    last_name: '',
+    company: '',
+    title: ''
+  })
+  const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.email) {
+      return toast('Email is required', 'error')
+    }
+    
+    setSaving(true)
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+      
+      const d = await res.json()
+      
+      if (res.ok) {
+        toast('Lead added successfully', 'success')
+        onSuccess()
+      } else {
+        toast(d.error || 'Failed to add lead', 'error')
+      }
+    } catch (err: any) {
+      toast(err.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md animate-slide-in-up">
+        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-xl">
+          <h2 className="text-xl font-bold text-slate-800">Add Lead</h2>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Email <span className="text-rose-500">*</span></label>
+              <input 
+                type="email" 
+                required
+                value={formData.email}
+                onChange={e => setFormData({...formData, email: e.target.value})}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="john@example.com"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
+                <input 
+                  type="text" 
+                  value={formData.first_name}
+                  onChange={e => setFormData({...formData, first_name: e.target.value})}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  placeholder="John"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Last Name</label>
+                <input 
+                  type="text" 
+                  value={formData.last_name}
+                  onChange={e => setFormData({...formData, last_name: e.target.value})}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Doe"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Company</label>
+              <input 
+                type="text" 
+                value={formData.company}
+                onChange={e => setFormData({...formData, company: e.target.value})}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="Acme Corp"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
+              <input 
+                type="text" 
+                value={formData.title}
+                onChange={e => setFormData({...formData, title: e.target.value})}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="CEO"
+              />
+            </div>
+          </div>
+          
+          <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl flex justify-end gap-3">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
+            <button type="submit" disabled={saving || !formData.email} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50">
+              {saving ? 'Adding...' : 'Add Lead'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

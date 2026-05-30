@@ -6,6 +6,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   
   const { data, error } = await supabase
     .from('leads')
@@ -33,6 +35,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const body = await request.json()
 
   // Remove related objects if mistakenly sent
@@ -71,6 +76,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   
   const { error } = await supabase
     .from('leads')

@@ -10,14 +10,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSettings } from '@/lib/settings'
 import { runAppointmentSetter } from '@/lib/ai'
 import { researchCompany } from '@/lib/firecrawl'
 import crypto from 'crypto'
 
 export async function POST(request: NextRequest) {
-  const supabase = createServerClient()
+  const supabase = createAdminClient()
 
   let rawBody: string
   let body: any
@@ -84,7 +84,7 @@ async function processWebhookAsync(
   settings: Record<string, string>,
   logId: string | null
 ) {
-  const supabase = createServerClient()
+  const supabase = createAdminClient()
   const data = body?.data
 
   if (!data) return

@@ -5,6 +5,9 @@ import { getSettings } from '@/lib/settings'
 
 export async function POST(request: NextRequest) {
   const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { sequence_id, status_filter } = await request.json()
 
   if (!sequence_id || !status_filter) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getSettings } from '@/lib/settings'
 import { calculateNextSendAt, isWithinSendWindow, isWeekend } from '@/lib/followup-scheduler'
 import { runFollowupAgent, runAppointmentSetter } from '@/lib/ai'
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const supabase = createServerClient()
+  const supabase = createAdminClient()
   const settings = await getSettings()
 
   // 0. Process queued inbound replies

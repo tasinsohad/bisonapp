@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient } from '@/lib/supabase/server'
 import { testBisonConnection } from '@/lib/bison'
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createServerClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { instance_url, api_key } = await request.json()
 
     if (!instance_url || !api_key) {

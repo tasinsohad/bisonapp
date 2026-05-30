@@ -3,6 +3,9 @@ import { createServerClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
 
   // Fetch failed operations from email_logs
   const { data: failedLogs, error } = await supabase
@@ -32,6 +35,8 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')

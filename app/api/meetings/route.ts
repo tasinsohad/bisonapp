@@ -3,6 +3,9 @@ import { createServerClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  
   const searchParams = request.nextUrl.searchParams
   
   const page = parseInt(searchParams.get('page') || '1')

@@ -6,6 +6,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const body = await request.json()
 
   body.updated_at = new Date().toISOString()
@@ -29,6 +32,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
 
   const { error } = await supabase
     .from('followup_sequences')

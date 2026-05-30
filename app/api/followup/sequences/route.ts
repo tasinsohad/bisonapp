@@ -3,6 +3,9 @@ import { createServerClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
 
   // Get sequences with enrollment count
   const { data: sequences, error } = await supabase
@@ -28,6 +31,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const body = await request.json()
 
   if (!body.name || !body.steps || !Array.isArray(body.steps)) {

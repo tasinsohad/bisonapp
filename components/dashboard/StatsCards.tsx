@@ -31,7 +31,8 @@ function StatCard({ card }: { card: any }) {
       ref={cardRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className="bg-white rounded-[24px] border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.012)] p-6 flex flex-col justify-between hover:shadow-[0_12px_40px_rgba(0,0,0,0.04)] hover:border-blue-100 transition-all duration-300 ease-out transform-gpu cursor-default relative overflow-hidden group"
+      onClick={card.onClick}
+      className={`bg-white rounded-[24px] border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.012)] p-6 flex flex-col justify-between hover:shadow-[0_12px_40px_rgba(0,0,0,0.04)] hover:border-blue-100 transition-all duration-300 ease-out transform-gpu relative overflow-hidden group ${card.onClick ? 'cursor-pointer' : 'cursor-default'}`}
       style={{ 
         transform: `perspective(1000px) rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) scale(${rotate.x || rotate.y ? 1.02 : 1})`,
         transformStyle: 'preserve-3d'
@@ -49,22 +50,24 @@ function StatCard({ card }: { card: any }) {
             {card.value}
           </span>
         </div>
-        <div className={`p-3 rounded-2xl border ${card.color} flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm`}>
+        <div className={`p-3 rounded-2xl border flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm ${card.color}`}>
           <Icon className="w-5 h-5" />
         </div>
       </div>
       
       <div className="mt-4 pt-3 border-t border-slate-50 flex items-center gap-1.5 relative z-10" style={{ transform: 'translateZ(10px)' }}>
-        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+        <div className={`w-2 h-2 rounded-full animate-pulse ${card.pulseColor || 'bg-emerald-500'}`}></div>
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-          Live updates active
+          {card.footerText || 'Live updates active'}
         </span>
       </div>
     </div>
   )
 }
 
-export function StatsCards({ stats }: { stats: any }) {
+import { AlertOctagon } from 'lucide-react'
+
+export function StatsCards({ stats, onFailedClick }: { stats: any, onFailedClick?: () => void }) {
   const cards = [
     {
       title: 'Total Leads',
@@ -90,10 +93,19 @@ export function StatsCards({ stats }: { stats: any }) {
       icon: MessageSquare,
       color: 'text-emerald-500 bg-emerald-50 border-emerald-100',
     },
+    {
+      title: 'Failed Ops',
+      value: stats?.failed_operations || 0,
+      icon: AlertOctagon,
+      color: 'text-rose-500 bg-rose-50 border-rose-100',
+      pulseColor: 'bg-rose-500',
+      footerText: 'Click for details',
+      onClick: onFailedClick,
+    }
   ]
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 perspective-1000">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8 perspective-1000">
       {cards.map((card, idx) => (
         <StatCard key={idx} card={card} />
       ))}

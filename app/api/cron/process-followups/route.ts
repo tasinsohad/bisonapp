@@ -30,11 +30,12 @@ export async function POST(request: NextRequest) {
     for (const item of queuedReplies) {
       await supabase.from('reply_queue').update({ status: 'processing', updated_at: new Date().toISOString() }).eq('id', item.id)
       try {
-        await runAppointmentSetter(item.lead_id)
-        await supabase.from('reply_queue').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', item.id)
+        const success = await runAppointmentSetter(item.lead_id)
+        const finalStatus = success ? 'completed' : 'failed'
+        await supabase.from('reply_queue').update({ status: finalStatus, updated_at: new Date().toISOString() }).eq('id', item.id)
       } catch (err) {
         console.error(`Failed to process queued reply ${item.id}:`, err)
-        await supabase.from('reply_queue').update({ status: 'pending', updated_at: new Date().toISOString() }).eq('id', item.id)
+        await supabase.from('reply_queue').update({ status: 'failed', updated_at: new Date().toISOString() }).eq('id', item.id)
       }
     }
   }

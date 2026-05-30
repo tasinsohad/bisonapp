@@ -8,7 +8,8 @@ export async function GET(request: NextRequest) {
     { count: totalLeads },
     { count: meetingsThisMonth },
     { count: activeEnrollments },
-    { count: repliesToday }
+    { count: repliesToday },
+    { count: failedOperations }
   ] = await Promise.all([
     supabase.from('leads').select('*', { count: 'exact', head: true }),
     
@@ -23,7 +24,11 @@ export async function GET(request: NextRequest) {
     supabase.from('activity_feed')
       .select('*', { count: 'exact', head: true })
       .eq('event_type', 'reply_received')
-      .gte('created_at', new Date(new Date().setHours(0,0,0,0)).toISOString())
+      .gte('created_at', new Date(new Date().setHours(0,0,0,0)).toISOString()),
+      
+    supabase.from('email_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'failed')
   ])
 
   return NextResponse.json({
@@ -31,7 +36,8 @@ export async function GET(request: NextRequest) {
       total_leads: totalLeads || 0,
       meetings_this_month: meetingsThisMonth || 0,
       active_enrollments: activeEnrollments || 0,
-      replies_today: repliesToday || 0
+      replies_today: repliesToday || 0,
+      failed_operations: failedOperations || 0
     }
   })
 }

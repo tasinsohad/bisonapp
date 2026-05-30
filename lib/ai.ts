@@ -102,7 +102,7 @@ function parseAgentJSON(raw: string): AgentAction | null {
  * Triggered by webhook. Reads conversation from Bison API,
  * cleans thread, runs through OpenAI, executes the decided action.
  */
-export async function runAppointmentSetter(leadId: string): Promise<void> {
+export async function runAppointmentSetter(leadId: string): Promise<boolean> {
   const supabase = createServerClient()
   const settings = await getSettings()
 
@@ -115,13 +115,13 @@ export async function runAppointmentSetter(leadId: string): Promise<void> {
 
   if (leadError || !lead) {
     console.error('Failed to load lead for appointment setter:', leadError)
-    return
+    return false
   }
 
   // Skip if lead doesn't have required Bison data
   if (!lead.bison_reply_id || !lead.bison_sender_email_id) {
     console.error(`Lead ${leadId} missing bison_reply_id or bison_sender_email_id`)
-    return
+    return false
   }
 
   const instanceUrl = lead.bison_instance_url || settings.bison_instance_url
@@ -129,7 +129,7 @@ export async function runAppointmentSetter(leadId: string): Promise<void> {
 
   if (!instanceUrl || !apiKey) {
     console.error('Missing Bison instance URL or API key')
-    return
+    return false
   }
 
   // Fetch conversation thread from Bison
@@ -147,7 +147,7 @@ export async function runAppointmentSetter(leadId: string): Promise<void> {
   let systemPrompt = settings.appt_setter_system_prompt
   if (!systemPrompt) {
     console.error('No appointment setter system prompt configured')
-    return
+    return false
   }
 
   systemPrompt = injectVariables(systemPrompt, lead, settings, conversationText)
@@ -172,7 +172,7 @@ export async function runAppointmentSetter(leadId: string): Promise<void> {
 
   if (!aiApiKey && provider !== 'openrouter') {
     console.error(`No API key configured for provider: ${provider}`)
-    return
+    return false
   }
 
   let rawResponse = ''
@@ -208,7 +208,7 @@ export async function runAppointmentSetter(leadId: string): Promise<void> {
       success: false,
       error_message: error.message,
     })
-    return
+    return false
   }
 
   // Log agent run
@@ -225,7 +225,7 @@ export async function runAppointmentSetter(leadId: string): Promise<void> {
 
   if (!parsedAction) {
     console.error('Failed to parse appointment setter response after retry')
-    return
+    return false
   }
 
   // Execute the action
@@ -257,8 +257,9 @@ export async function runAppointmentSetter(leadId: string): Promise<void> {
           description: `AI ${parsedAction.action}: ${parsedAction.reason || 'Email sent'}`,
           metadata: { action: parsedAction.action, agent: 'appointment_setter' },
         })
+        return true
       }
-      break
+      return false
     }
 
     case 'BOOK_MEETING': {
@@ -289,31 +290,32 @@ export async function runAppointmentSetter(leadId: string): Promise<void> {
       const result = await sendBisonEmail({ lead, messageText: parsedAction.message })
       if (result.success) {
         await appendOutboundMessage(supabase, lead, parsedAction.message)
+
+        // Update lead status
+        await supabase.from('leads').update({
+          status: 'meeting_scheduled',
+          last_activity_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq('id', leadId)
+
+        // Cancel followup enrollments
+        await supabase.from('followup_enrollments').update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString(),
+        }).eq('lead_id', leadId).eq('status', 'active')
+
+        // Activity feed
+        await supabase.from('activity_feed').insert({
+          lead_id: leadId,
+          lead_email: lead.email,
+          lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
+          event_type: 'meeting_booked',
+          description: `Meeting ${bookingSuccess ? 'booked' : 'proposed'}: ${parsedAction.reason}`,
+          metadata: { action: 'BOOK_MEETING', proposedDateTime: parsedAction.proposedDateTime },
+        })
+        return true
       }
-
-      // Update lead status
-      await supabase.from('leads').update({
-        status: 'meeting_scheduled',
-        last_activity_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }).eq('id', leadId)
-
-      // Cancel followup enrollments
-      await supabase.from('followup_enrollments').update({
-        status: 'cancelled',
-        updated_at: new Date().toISOString(),
-      }).eq('lead_id', leadId).eq('status', 'active')
-
-      // Activity feed
-      await supabase.from('activity_feed').insert({
-        lead_id: leadId,
-        lead_email: lead.email,
-        lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
-        event_type: 'meeting_booked',
-        description: `Meeting ${bookingSuccess ? 'booked' : 'proposed'}: ${parsedAction.reason}`,
-        metadata: { action: 'BOOK_MEETING', proposedDateTime: parsedAction.proposedDateTime },
-      })
-      break
+      return false
     }
 
     case 'DONE': {
@@ -339,8 +341,11 @@ export async function runAppointmentSetter(leadId: string): Promise<void> {
         description: `Appointment setter marked DONE: ${parsedAction.reason}`,
         metadata: { action: 'DONE', agent: 'appointment_setter' },
       })
-      break
+      return true
     }
+    
+    default:
+      return false
   }
 }
 

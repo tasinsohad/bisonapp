@@ -29,3 +29,24 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({ data: failedLogs })
 }
+
+export async function DELETE(request: NextRequest) {
+  const supabase = createServerClient()
+  
+  const { searchParams } = new URL(request.url)
+  const id = searchParams.get('id')
+
+  let query = supabase.from('email_logs').delete().eq('status', 'failed')
+
+  if (id) {
+    query = query.eq('id', id)
+  }
+
+  const { error } = await query
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true })
+}

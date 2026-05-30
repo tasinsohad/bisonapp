@@ -6,7 +6,7 @@ import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { LeadPipeline } from '@/components/dashboard/LeadPipeline'
 import { useToast } from '@/components/shared/Toast'
 import { format } from 'date-fns'
-import { X, AlertOctagon } from 'lucide-react'
+import { X, AlertOctagon, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 export default function DashboardPage() {
@@ -53,15 +53,52 @@ export default function DashboardPage() {
 function FailedOperationsModal({ onClose }: { onClose: () => void }) {
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
 
-  useEffect(() => {
+  const fetchLogs = () => {
+    setLoading(true)
     fetch('/api/dashboard/failed-operations')
       .then(r => r.json())
       .then(d => {
         if (d.data) setLogs(d.data)
       })
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    fetchLogs()
   }, [])
+
+  const handleClearAll = async () => {
+    if (!confirm('Are you sure you want to clear all failed operation logs?')) return
+    try {
+      const res = await fetch('/api/dashboard/failed-operations', { method: 'DELETE' })
+      const data = await res.json()
+      if (data.success) {
+        toast('All failed logs cleared', 'success')
+        fetchLogs()
+      } else {
+        toast(data.error || 'Failed to clear logs', 'error')
+      }
+    } catch (e: any) {
+      toast(e.message, 'error')
+    }
+  }
+
+  const handleClearSpecific = async (id: string) => {
+    try {
+      const res = await fetch(`/api/dashboard/failed-operations?id=${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (data.success) {
+        toast('Log cleared', 'success')
+        fetchLogs()
+      } else {
+        toast(data.error || 'Failed to clear log', 'error')
+      }
+    } catch (e: any) {
+      toast(e.message, 'error')
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -94,6 +131,7 @@ function FailedOperationsModal({ onClose }: { onClose: () => void }) {
                   <th className="px-6 py-3 font-medium">Lead</th>
                   <th className="px-6 py-3 font-medium">Sender Address</th>
                   <th className="px-6 py-3 font-medium">Error Message</th>
+                  <th className="px-6 py-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -122,6 +160,15 @@ function FailedOperationsModal({ onClose }: { onClose: () => void }) {
                         {log.error_message || 'Unknown Error'}
                       </div>
                     </td>
+                    <td className="px-6 py-4 text-right">
+                      <button 
+                        onClick={() => handleClearSpecific(log.id)}
+                        className="text-slate-400 hover:text-rose-600 transition-colors p-2 rounded-lg hover:bg-rose-50"
+                        title="Clear log"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -133,9 +180,16 @@ function FailedOperationsModal({ onClose }: { onClose: () => void }) {
           <div className="text-sm text-slate-500">
             Showing latest {logs.length} failed operations
           </div>
-          <button onClick={onClose} className="px-6 py-2 text-slate-600 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200 transition-colors">
-            Close
-          </button>
+          <div className="flex gap-3">
+            {logs.length > 0 && (
+              <button onClick={handleClearAll} className="px-6 py-2 text-rose-600 bg-white border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors">
+                Clear All
+              </button>
+            )}
+            <button onClick={onClose} className="px-6 py-2 text-slate-600 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200 transition-colors">
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

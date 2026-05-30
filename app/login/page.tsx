@@ -46,6 +46,7 @@ export default function LoginPage() {
         })
         if (error) throw error
         setError('Check your email for the confirmation link.')
+        setLoading(false)
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -54,10 +55,10 @@ export default function LoginPage() {
         if (error) throw error
         router.push('/dashboard')
         router.refresh()
+        // Do not set loading false here to keep button disabled during redirect
       }
     } catch (err: any) {
       setError(err.message)
-    } finally {
       setLoading(false)
     }
   }

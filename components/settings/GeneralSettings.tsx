@@ -3,14 +3,45 @@
 import { Save, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { useToast } from '@/components/shared/Toast'
 
 export function GeneralSettings({ settings, setSettings, onSave }: any) {
   const supabase = createClient()
   const router = useRouter()
+  const [isUploading, setIsUploading] = useState(false)
+  const { toast } = useToast()
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch('/api/settings/upload-logo', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.error || 'Failed to upload logo')
+
+      setSettings({ ...settings, app_logo_url: data.url })
+      toast('Logo uploaded successfully! Make sure to save settings.', 'success')
+    } catch (err: any) {
+      toast(err.message, 'error')
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   return (
@@ -42,50 +73,18 @@ export function GeneralSettings({ settings, setSettings, onSave }: any) {
                 Logo
               </div>
             )}
-            <label className="cursor-pointer px-4 py-2 bg-white border border-slate-300 rounded-lg shadow-sm text-sm font-medium text-slate-700 hover:bg-slate-50">
-              <span>Upload Logo</span>
+            <label className={`cursor-pointer px-4 py-2 bg-white border border-slate-300 rounded-lg shadow-sm text-sm font-medium text-slate-700 transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'}`}>
+              <span>{isUploading ? 'Uploading...' : 'Upload Logo'}</span>
               <input
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  const reader = new FileReader()
-                  reader.onload = (event) => {
-                    const img = new Image()
-                    img.onload = async () => {
-                      const canvas = document.createElement('canvas')
-                      const size = 512
-                      canvas.width = size
-                      canvas.height = size
-                      const ctx = canvas.getContext('2d')
-                      if (!ctx) return
-              
-                      const scale = Math.max(size / img.width, size / img.height)
-                      const x = (size - img.width * scale) / 2
-                      const y = (size - img.height * scale) / 2
-              
-                      ctx.drawImage(img, x, y, img.width * scale, img.height * scale)
-              
-                      canvas.toBlob(async (blob) => {
-                        if (!blob) return
-                        const fileName = `logo_${Date.now()}.png`
-                        const { data, error } = await supabase.storage.from('workspace').upload(fileName, blob, { contentType: 'image/png', upsert: true })
-                        if (data) {
-                          const { data: publicUrlData } = supabase.storage.from('workspace').getPublicUrl(fileName)
-                          setSettings({ ...settings, app_logo_url: publicUrlData.publicUrl })
-                        }
-                      }, 'image/png')
-                    }
-                    img.src = event.target?.result as string
-                  }
-                  reader.readAsDataURL(file)
-                }}
+                disabled={isUploading}
+                onChange={handleLogoUpload}
               />
             </label>
           </div>
-          <p className="mt-2 text-xs text-slate-500">Logo is automatically cropped to a square and used as the app icon and favicon.</p>
+          <p className="mt-2 text-xs text-slate-500">Logo will be used as the app icon and favicon.</p>
         </div>
 
         <div className="sm:col-span-4 mt-2">

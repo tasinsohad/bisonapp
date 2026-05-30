@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Settings as SettingsIcon, Mail, Bot, Calendar, MessageSquare, Clock, Webhook, Shield } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
+import { useWorkspace } from '@/components/providers/WorkspaceProvider'
 
 import { BisonSettings } from '@/components/settings/BisonSettings'
 import { AISettings } from '@/components/settings/AISettings'
@@ -17,6 +18,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<any>({})
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
+  const { updateWorkspace } = useWorkspace()
 
   const fetchSettings = async () => {
     try {
@@ -42,6 +44,7 @@ export default function SettingsPage() {
         body: JSON.stringify(settings)
       })
       if (res.ok) {
+        updateWorkspace(settings.app_name, settings.app_logo_url)
         toast('Settings saved successfully', 'success')
       } else {
         const d = await res.json()

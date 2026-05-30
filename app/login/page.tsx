@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { useWorkspace } from '@/components/providers/WorkspaceProvider'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+  const { workspaceName, workspaceLogo } = useWorkspace()
   
   const router = useRouter()
   const supabase = createClient()
@@ -68,10 +70,14 @@ export default function LoginPage() {
       {/* LEFT COLUMN: Clean Minimalist Brand Accent */}
       <div className="w-full md:w-1/2 flex flex-col justify-between p-8 md:p-16 bg-white z-10 relative">
         <div className="flex items-center gap-2 transform transition-transform duration-700 hover:scale-105 origin-left">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-            L
-          </div>
-          <span className="text-xl font-bold tracking-tight text-slate-900">LeadPilot</span>
+          {workspaceLogo ? (
+            <img src={workspaceLogo} alt={workspaceName} className="w-8 h-8 object-contain" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+              {workspaceName.substring(0, 1).toUpperCase()}
+            </div>
+          )}
+          <span className="text-xl font-bold tracking-tight text-slate-900">{workspaceName}</span>
         </div>
 
         <div className="my-auto py-12 md:py-0 max-w-xl">
@@ -91,7 +97,7 @@ export default function LoginPage() {
         </div>
 
         <div className="text-xs text-slate-400 font-medium animate-fade-in" style={{ animationDuration: '1.5s' }}>
-          &copy; {new Date().getFullYear()} LeadPilot Inc. All rights reserved.
+          &copy; {new Date().getFullYear()} {workspaceName} Inc. All rights reserved.
         </div>
       </div>
 

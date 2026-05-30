@@ -25,11 +25,67 @@ export function GeneralSettings({ settings, setSettings, onSave }: any) {
           <label className="block text-sm font-medium text-slate-700 mb-1">Company / Workspace Name</label>
           <input
             type="text"
-            value={settings.workspace_name || ''}
-            onChange={(e) => setSettings({ ...settings, workspace_name: e.target.value })}
+            value={settings.app_name || ''}
+            onChange={(e) => setSettings({ ...settings, app_name: e.target.value })}
             placeholder="Acme Corp"
             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
           />
+        </div>
+
+        <div className="sm:col-span-4 mt-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Workspace Logo</label>
+          <div className="flex items-center gap-4 mt-2">
+            {settings.app_logo_url ? (
+              <img src={settings.app_logo_url} alt="Logo" className="w-16 h-16 object-contain" />
+            ) : (
+              <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200">
+                Logo
+              </div>
+            )}
+            <label className="cursor-pointer px-4 py-2 bg-white border border-slate-300 rounded-lg shadow-sm text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <span>Upload Logo</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = (event) => {
+                    const img = new Image()
+                    img.onload = async () => {
+                      const canvas = document.createElement('canvas')
+                      const size = 512
+                      canvas.width = size
+                      canvas.height = size
+                      const ctx = canvas.getContext('2d')
+                      if (!ctx) return
+              
+                      const scale = Math.max(size / img.width, size / img.height)
+                      const x = (size - img.width * scale) / 2
+                      const y = (size - img.height * scale) / 2
+              
+                      ctx.drawImage(img, x, y, img.width * scale, img.height * scale)
+              
+                      canvas.toBlob(async (blob) => {
+                        if (!blob) return
+                        const fileName = `logo_${Date.now()}.png`
+                        const { data, error } = await supabase.storage.from('workspace').upload(fileName, blob, { contentType: 'image/png', upsert: true })
+                        if (data) {
+                          const { data: publicUrlData } = supabase.storage.from('workspace').getPublicUrl(fileName)
+                          setSettings({ ...settings, app_logo_url: publicUrlData.publicUrl })
+                        }
+                      }, 'image/png')
+                    }
+                    img.src = event.target?.result as string
+                  }
+                  reader.readAsDataURL(file)
+                }}
+              />
+            </label>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">Logo is automatically cropped to a square and used as the app icon and favicon.</p>
         </div>
 
         <div className="sm:col-span-4 mt-2">

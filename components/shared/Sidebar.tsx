@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, Users, Calendar, Clock, Settings, LogOut, Menu, X, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
+import { useWorkspace } from '@/components/providers/WorkspaceProvider'
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -20,6 +21,7 @@ export default function Sidebar() {
   const supabase = createClient()
   const [email, setEmail] = useState<string>('')
   const [isOpen, setIsOpen] = useState(false)
+  const { workspaceName, workspaceLogo } = useWorkspace()
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -36,12 +38,16 @@ export default function Sidebar() {
     <div className="flex flex-col h-full bg-[#f4f5f7] text-slate-800 w-64 p-5 transition-all duration-300">
       {/* Brand Section */}
       <div className="flex items-center gap-3 mb-10 px-2">
-        <div className="w-11 h-11 rounded-full bg-slate-950 flex items-center justify-center text-white font-black text-sm tracking-tighter shadow-sm">
-          LP
-        </div>
+        {workspaceLogo ? (
+          <img src={workspaceLogo} alt={workspaceName} className="w-11 h-11 object-contain" />
+        ) : (
+          <div className="w-11 h-11 rounded-full bg-slate-950 flex items-center justify-center text-white font-black text-sm tracking-tighter shadow-sm">
+            {workspaceName.substring(0, 2).toUpperCase()}
+          </div>
+        )}
         <div className="flex flex-col">
-          <span className="text-sm font-extrabold text-slate-900 tracking-tight leading-none mb-1">
-            LeadPilot
+          <span className="text-sm font-extrabold text-slate-900 tracking-tight leading-none mb-1 line-clamp-1">
+            {workspaceName}
           </span>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             Sales Dashboard

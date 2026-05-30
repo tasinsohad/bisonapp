@@ -9,9 +9,21 @@ const plusJakartaSans = Plus_Jakarta_Sans({
   variable: '--font-sans',
 })
 
-export const metadata: Metadata = {
-  title: 'LeadPilot',
-  description: 'AI Sales Automation Platform',
+import { getSettings } from '@/lib/settings'
+import { WorkspaceProvider } from '@/components/providers/WorkspaceProvider'
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSettings()
+  const appName = settings.app_name || 'LeadPilot'
+  const appLogoUrl = settings.app_logo_url || '/favicon.ico'
+
+  return {
+    title: appName,
+    description: 'AI Sales Automation Platform',
+    icons: {
+      icon: appLogoUrl,
+    }
+  }
 }
 
 export default function RootLayout({
@@ -22,9 +34,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={plusJakartaSans.variable}>
       <body className="font-sans antialiased text-slate-900 bg-[#f4f5f7]">
-        <ToastProvider>
-          {children}
-        </ToastProvider>
+        <WorkspaceProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </WorkspaceProvider>
       </body>
     </html>
   )

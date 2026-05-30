@@ -18,6 +18,10 @@ export async function POST(request: NextRequest) {
 
   const supabase = createAdminClient()
   const settings = await getSettings()
+  
+  // Vercel execution timeout guard (45 seconds)
+  const startTime = Date.now()
+  const MAX_EXECUTION_TIME = 45000
 
   // 0. Process queued inbound replies
   const { data: queuedReplies } = await supabase
@@ -25,9 +29,11 @@ export async function POST(request: NextRequest) {
     .select('id, lead_id')
     .eq('status', 'pending')
     .lte('send_after', new Date().toISOString())
+    .limit(20)
     
   if (queuedReplies && queuedReplies.length > 0) {
     for (const item of queuedReplies) {
+      if (Date.now() - startTime > MAX_EXECUTION_TIME) break;
       await supabase.from('reply_queue').update({ status: 'processing', updated_at: new Date().toISOString() }).eq('id', item.id)
       try {
         const success = await runAppointmentSetter(item.lead_id)
@@ -50,6 +56,7 @@ export async function POST(request: NextRequest) {
     `)
     .eq('status', 'active')
     .lte('next_send_at', new Date().toISOString())
+    .limit(20)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -68,6 +75,8 @@ export async function POST(request: NextRequest) {
   let failed = 0
 
   for (const enrollment of enrollments) {
+    if (Date.now() - startTime > MAX_EXECUTION_TIME) break;
+    
     processed++
     const lead = enrollment.leads
     const sequence = enrollment.followup_sequences

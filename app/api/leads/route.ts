@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { LeadCreateSchema } from '@/lib/validations'
 
 export async function GET(request: NextRequest) {
   const supabase = createServerClient()
@@ -64,14 +65,12 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await request.json()
+  try {
+    const rawBody = await request.json()
+    const body = LeadCreateSchema.parse(rawBody)
 
-  if (!body.email) {
-    return NextResponse.json({ error: 'Email is required' }, { status: 400 })
-  }
-
-  // Insert lead
-  const { data: lead, error: leadError } = await supabase
+    // Insert lead
+    const { data: lead, error: leadError } = await supabase
     .from('leads')
     .insert({
       email: body.email,
@@ -108,4 +107,11 @@ export async function POST(request: NextRequest) {
   })
 
   return NextResponse.json({ data: lead }, { status: 201 })
+
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return NextResponse.json({ error: 'Validation failed', details: error.errors }, { status: 400 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 }

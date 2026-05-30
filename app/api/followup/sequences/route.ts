@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { SequenceCreateSchema } from '@/lib/validations'
 
 export async function GET(request: NextRequest) {
   const supabase = createServerClient()
@@ -34,13 +35,11 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await request.json()
+  try {
+    const rawBody = await request.json()
+    const body = SequenceCreateSchema.parse(rawBody)
 
-  if (!body.name || !body.steps || !Array.isArray(body.steps)) {
-    return NextResponse.json({ error: 'Name and steps array are required' }, { status: 400 })
-  }
-
-  const { data, error } = await supabase
+    const { data, error } = await supabase
     .from('followup_sequences')
     .insert({
       name: body.name,
@@ -55,4 +54,10 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ data }, { status: 201 })
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return NextResponse.json({ error: 'Validation failed', details: error.errors }, { status: 400 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 }

@@ -5,12 +5,14 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useToast } from '@/components/shared/Toast'
+import { useWorkspace } from '@/components/providers/WorkspaceProvider'
 
 export function GeneralSettings({ settings, setSettings, onSave }: any) {
   const supabase = createClient()
   const router = useRouter()
   const [isUploading, setIsUploading] = useState(false)
   const { toast } = useToast()
+  const { updateWorkspace } = useWorkspace()
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -35,8 +37,20 @@ export function GeneralSettings({ settings, setSettings, onSave }: any) {
 
       if (!res.ok) throw new Error(data.error || 'Failed to upload logo')
 
+      // Update local form state
       setSettings({ ...settings, app_logo_url: data.url })
-      toast('Logo uploaded successfully! Make sure to save settings.', 'success')
+      
+      // Auto-save the new logo directly to the database so they don't have to click save
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ app_logo_url: data.url })
+      })
+
+      // Update the global workspace context to instantly reflect in Sidebar
+      updateWorkspace(settings.app_name, data.url)
+
+      toast('Logo uploaded and applied successfully!', 'success')
     } catch (err: any) {
       toast(err.message, 'error')
     } finally {

@@ -6,7 +6,15 @@ import { runFollowupAgent, runAppointmentSetter } from '@/lib/ai'
 import { sendBisonEmail } from '@/lib/send-email'
 import { syncLeadThread } from '@/lib/bison-sync'
 
+export async function GET(request: NextRequest) {
+  return processCron(request)
+}
+
 export async function POST(request: NextRequest) {
+  return processCron(request)
+}
+
+async function processCron(request: NextRequest) {
   // Validate CRON_SECRET if it exists in env
   const expectedSecret = process.env.CRON_SECRET
   if (expectedSecret) {

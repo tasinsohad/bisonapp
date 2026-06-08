@@ -9,7 +9,7 @@
  */
 
 import { getSettings } from '@/lib/settings'
-import { createServerClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 interface Lead {
   id: string
@@ -43,7 +43,7 @@ export async function sendBisonEmail({
   lead: Lead
   messageText: string
 }): Promise<SendEmailResult> {
-  const supabase = createServerClient()
+  const supabase = createAdminClient()
 
   try {
     // Validate required lead fields

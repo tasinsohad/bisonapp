@@ -6,11 +6,12 @@
  */
 
 import { getSettings } from '@/lib/settings'
-import { createServerClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getConversationThread } from '@/lib/bison'
 import { cleanThread } from '@/lib/thread-cleaner'
 import { sendBisonEmail } from '@/lib/send-email'
 import { bookCalMeeting } from '@/lib/cal'
+import { calculateNextSendAt } from '@/lib/followup-scheduler'
 
 interface Lead {
   id: string
@@ -103,7 +104,7 @@ function parseAgentJSON(raw: string): AgentAction | null {
  * cleans thread, runs through OpenAI, executes the decided action.
  */
 export async function runAppointmentSetter(leadId: string): Promise<boolean> {
-  const supabase = createServerClient()
+  const supabase = createAdminClient()
   const settings = await getSettings()
 
   // Load lead
@@ -246,6 +247,42 @@ export async function runAppointmentSetter(leadId: string): Promise<boolean> {
             last_activity_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }).eq('id', leadId)
+          
+          // Automatically enroll in default follow-up sequence
+          const defaultSequenceId = settings.default_sequence_id
+          if (defaultSequenceId) {
+            const { data: existingEnrollment } = await supabase
+              .from('followup_enrollments')
+              .select('id')
+              .eq('lead_id', leadId)
+              .in('status', ['active', 'paused'])
+              .single()
+              
+            if (!existingEnrollment) {
+              const { data: sequence } = await supabase
+                .from('followup_sequences')
+                .select('steps')
+                .eq('id', defaultSequenceId)
+                .single()
+                
+              if (sequence?.steps && (sequence.steps as any[]).length > 0) {
+                const stepConfig = (sequence.steps as any[])[0]
+                const timezone = settings.app_timezone || 'America/New_York'
+                const windowStart = parseInt(settings.send_window_start || '9')
+                const windowEnd = parseInt(settings.send_window_end || '18')
+                
+                const nextSend = calculateNextSendAt(stepConfig, timezone, windowStart, windowEnd)
+                
+                await supabase.from('followup_enrollments').insert({
+                  lead_id: leadId,
+                  sequence_id: defaultSequenceId,
+                  current_step: 1,
+                  status: 'active',
+                  next_send_at: nextSend.toISOString()
+                })
+              }
+            }
+          }
         }
 
         // Activity feed
@@ -409,7 +446,7 @@ export async function runFollowupAgent(
 
   if (!aiApiKey && provider !== 'openrouter') return null
 
-  const supabase = createServerClient()
+  const supabase = createAdminClient()
 
   try {
     const messages = [

@@ -1,5 +1,5 @@
 import { getSettings } from '@/lib/settings'
-import { createServerClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 interface Lead {
   id: string
@@ -14,7 +14,7 @@ interface Lead {
 }
 
 export async function syncLeadThread(lead: Lead): Promise<{ success: boolean; hasNewReply: boolean; error?: string }> {
-  const supabase = createServerClient()
+  const supabase = createAdminClient()
   
   try {
     if (!lead.bison_reply_id) {

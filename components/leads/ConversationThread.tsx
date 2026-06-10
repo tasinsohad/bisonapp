@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { useToast } from '@/components/shared/Toast'
-import { Send, Bot, RefreshCw } from 'lucide-react'
+import { Send, Bot, RefreshCw, Clock } from 'lucide-react'
 
 export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: any }) {
   const [replyText, setReplyText] = useState('')
@@ -12,6 +12,30 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
   const { toast } = useToast()
 
   const messages = lead.conversations?.[0]?.messages || []
+
+  // Pending AI Replies
+  const pendingReplies = (lead.reply_queue || [])
+    .filter((q: any) => q.status === 'pending' || q.status === 'processing')
+    .map((q: any) => ({
+      isPending: true,
+      type: 'ai_reply',
+      timestamp: q.send_after,
+      content: 'AI will draft and send a reply...',
+      status: q.status
+    }))
+
+  // Pending Followup
+  const activeEnrollment = (lead.followup_enrollments || []).find((e: any) => e.status === 'active')
+  const pendingFollowups = activeEnrollment && activeEnrollment.next_send_at ? [{
+    isPending: true,
+    type: 'followup',
+    timestamp: activeEnrollment.next_send_at,
+    content: `Scheduled Follow-up (Step ${activeEnrollment.current_step}) from "${activeEnrollment.followup_sequences?.name || 'Sequence'}"`,
+  }] : []
+
+  // Combine and sort
+  const allThreadItems = [...messages.map((m: any) => ({...m, isPending: false})), ...pendingReplies, ...pendingFollowups]
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 
   const handleSend = async () => {
     if (!replyText.trim()) return
@@ -75,10 +99,29 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
-        {messages.length === 0 ? (
+        {allThreadItems.length === 0 ? (
           <div className="text-center text-slate-400 py-10">No messages in thread yet.</div>
         ) : (
-          messages.map((msg: any, i: number) => {
+          allThreadItems.map((msg: any, i: number) => {
+            if (msg.isPending) {
+              return (
+                <div key={`pending-${i}`} className="flex flex-col items-end">
+                  <div className="max-w-[85%] rounded-2xl p-4 shadow-sm bg-indigo-50 border border-indigo-200 border-dashed text-slate-800 rounded-tr-sm opacity-80">
+                    <div className="text-xs mb-2 pb-2 border-b font-medium flex justify-between items-center gap-4 border-indigo-100 text-indigo-500">
+                      <span className="flex items-center"><Clock className="w-3 h-3 mr-1"/> Scheduled</span>
+                      <span>{format(new Date(msg.timestamp), 'MMM d, h:mm a')}</span>
+                    </div>
+                    <div className="flex items-center text-[10px] mb-2 uppercase tracking-wider text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full w-max mt-2">
+                      <Bot className="w-3 h-3 mr-1" /> {msg.type === 'ai_reply' ? 'AI Reply Queue' : 'Automated Sequence'}
+                    </div>
+                    <div className="text-sm leading-relaxed text-indigo-900 italic mt-1">
+                      {msg.content}
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
             const isInbound = msg.role === 'inbound'
             return (
               <div key={i} className={`flex flex-col ${isInbound ? 'items-start' : 'items-end'}`}>

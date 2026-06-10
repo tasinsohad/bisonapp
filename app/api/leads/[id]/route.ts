@@ -18,7 +18,8 @@ export async function GET(
         *,
         followup_sequences(*)
       ),
-      meetings(*)
+      meetings(*),
+      reply_queue(*)
     `)
     .eq('id', params.id)
     .single()

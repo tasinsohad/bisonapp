@@ -3,12 +3,14 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { useToast } from '@/components/shared/Toast'
-import { Send, Bot, RefreshCw, Clock } from 'lucide-react'
+import { Send, Bot, RefreshCw, Clock, Calendar } from 'lucide-react'
 
 export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: any }) {
   const [replyText, setReplyText] = useState('')
   const [sending, setSending] = useState(false)
   const [triggering, setTriggering] = useState(false)
+  const [reschedulingItem, setReschedulingItem] = useState<{id: string, type: string, date: string} | null>(null)
+  const [rescheduling, setRescheduling] = useState(false)
   const { toast } = useToast()
 
   const messages = lead.conversations?.[0]?.messages || []
@@ -18,6 +20,7 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
     .filter((q: any) => q.status === 'pending' || q.status === 'processing')
     .map((q: any) => ({
       isPending: true,
+      id: q.id,
       type: 'ai_reply',
       timestamp: q.send_after,
       content: 'AI will draft and send a reply...',
@@ -28,6 +31,7 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
   const activeEnrollment = (lead.followup_enrollments || []).find((e: any) => e.status === 'active')
   const pendingFollowups = activeEnrollment && activeEnrollment.next_send_at ? [{
     isPending: true,
+    id: activeEnrollment.id,
     type: 'followup',
     timestamp: activeEnrollment.next_send_at,
     content: `Scheduled Follow-up (Step ${activeEnrollment.current_step}) from "${activeEnrollment.followup_sequences?.name || 'Sequence'}"`,
@@ -60,6 +64,34 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
       toast(e.message, 'error')
     } finally {
       setSending(false)
+    }
+  }
+
+  const handleReschedule = async () => {
+    if (!reschedulingItem) return
+    setRescheduling(true)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/reschedule`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: reschedulingItem.id,
+          type: reschedulingItem.type,
+          newDate: new Date(reschedulingItem.date).toISOString()
+        })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast('Rescheduled successfully', 'success')
+        setReschedulingItem(null)
+        fetchLead()
+      } else {
+        toast(data.error || 'Failed to reschedule', 'error')
+      }
+    } catch (e: any) {
+      toast(e.message, 'error')
+    } finally {
+      setRescheduling(false)
     }
   }
 
@@ -109,7 +141,49 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                   <div className="max-w-[85%] rounded-2xl p-4 shadow-sm bg-indigo-50 border border-indigo-200 border-dashed text-slate-800 rounded-tr-sm opacity-80">
                     <div className="text-xs mb-2 pb-2 border-b font-medium flex justify-between items-center gap-4 border-indigo-100 text-indigo-500">
                       <span className="flex items-center"><Clock className="w-3 h-3 mr-1"/> Scheduled</span>
-                      <span>{format(new Date(msg.timestamp), 'MMM d, h:mm a')}</span>
+                      
+                      <div className="flex items-center gap-2">
+                        {reschedulingItem?.id === msg.id && reschedulingItem?.type === msg.type ? (
+                          <div className="flex items-center gap-1.5 bg-white rounded p-1 shadow-sm border border-indigo-100">
+                            <input 
+                              type="datetime-local" 
+                              value={reschedulingItem?.date || ''}
+                              onChange={e => setReschedulingItem(prev => prev ? { ...prev, date: e.target.value } : null)}
+                              className="text-xs border-none focus:ring-0 p-0 text-slate-700 bg-transparent h-5"
+                            />
+                            <button 
+                              onClick={handleReschedule} 
+                              disabled={rescheduling}
+                              className="px-2 py-0.5 bg-indigo-600 text-white rounded text-[10px] disabled:opacity-50 hover:bg-indigo-700 transition-colors"
+                            >
+                              Save
+                            </button>
+                            <button 
+                              onClick={() => setReschedulingItem(null)} 
+                              className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] hover:bg-slate-200 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <span>{format(new Date(msg.timestamp), 'MMM d, h:mm a')}</span>
+                            <button 
+                              onClick={() => {
+                                // Extract YYYY-MM-DDThh:mm string format for the datetime-local input using local time
+                                const d = new Date(msg.timestamp)
+                                const tzOffset = d.getTimezoneOffset() * 60000
+                                const localISOTime = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16)
+                                setReschedulingItem({ id: msg.id, type: msg.type, date: localISOTime })
+                              }}
+                              className="p-1 hover:bg-indigo-100 rounded text-indigo-400 hover:text-indigo-600 transition-colors"
+                              title="Reschedule"
+                            >
+                              <Calendar className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center text-[10px] mb-2 uppercase tracking-wider text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full w-max mt-2">
                       <Bot className="w-3 h-3 mr-1" /> {msg.type === 'ai_reply' ? 'AI Reply Queue' : 'Automated Sequence'}

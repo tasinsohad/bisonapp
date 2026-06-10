@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { useToast } from '@/components/shared/Toast'
-import { Send, Bot, RefreshCw, Clock, Calendar } from 'lucide-react'
+import { Send, Bot, RefreshCw, Clock, Calendar, Sparkles } from 'lucide-react'
 
 export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: any }) {
   const [replyText, setReplyText] = useState('')
@@ -13,19 +13,21 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
   const [rescheduling, setRescheduling] = useState(false)
   const [editingDraft, setEditingDraft] = useState<{id: string, type: string, text: string} | null>(null)
   const [savingDraft, setSavingDraft] = useState(false)
+  const [generatingDraft, setGeneratingDraft] = useState<string | null>(null)
   const { toast } = useToast()
 
   const messages = lead.conversations?.[0]?.messages || []
 
   // Pending AI Replies
   const pendingReplies = (lead.reply_queue || [])
-    .filter((q: any) => ['pending', 'processing', 'failed'].includes(q.status))
+    .filter((q: any) => ['pending', 'processing', 'failed', 'drafting'].includes(q.status))
     .map((q: any) => ({
       isPending: true,
       id: q.id,
       type: 'ai_reply',
       timestamp: q.send_after,
-      content: q.draft_message || (q.status === 'drafting' ? 'AI is drafting a reply...' : 'AI will send a generated reply...'),
+      content: q.draft_message || null,
+      hasDraft: !!q.draft_message,
       status: q.status
     }))
 
@@ -36,7 +38,8 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
     id: activeEnrollment.id,
     type: 'followup',
     timestamp: activeEnrollment.next_send_at,
-    content: activeEnrollment.draft_message || `Scheduled Follow-up (Step ${activeEnrollment.current_step}) from "${activeEnrollment.followup_sequences?.name || 'Sequence'}". Generating draft...`,
+    content: activeEnrollment.draft_message || null,
+    hasDraft: !!activeEnrollment.draft_message,
     status: 'pending'
   }] : []
 
@@ -123,6 +126,28 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
       toast(e.message, 'error')
     } finally {
       setSavingDraft(false)
+    }
+  }
+
+  const handleGenerateDraft = async (itemId: string, type: string) => {
+    setGeneratingDraft(itemId)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/generate-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId, type })
+      })
+      const data = await res.json()
+      if (res.ok && data.draft_message) {
+        toast('Draft generated successfully!', 'success')
+        fetchLead()
+      } else {
+        toast(data.error || 'Failed to generate draft', 'error')
+      }
+    } catch (e: any) {
+      toast(e.message, 'error')
+    } finally {
+      setGeneratingDraft(null)
     }
   }
 
@@ -237,14 +262,31 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                           </button>
                         </div>
                       </div>
-                    ) : (
+                    ) : msg.hasDraft ? (
                       <div className="text-sm leading-relaxed text-indigo-900 mt-2 relative group w-full text-left bg-white/50 rounded-lg p-3 border border-indigo-100">
-                        {msg.content}
+                        <div className="whitespace-pre-wrap">{msg.content}</div>
                         <button 
                           onClick={() => setEditingDraft({id: msg.id, type: msg.type, text: msg.content})}
                           className="absolute -top-2.5 -right-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow hover:bg-indigo-50 font-medium"
                         >
                           Edit Draft
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-2 w-full text-left">
+                        <div className="text-sm text-slate-500 italic mb-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          ⏳ No draft generated yet. Click below to generate the AI message.
+                        </div>
+                        <button
+                          onClick={() => handleGenerateDraft(msg.id, msg.type)}
+                          disabled={generatingDraft === msg.id}
+                          className="px-4 py-2 text-xs bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-60 transition-all font-medium flex items-center gap-1.5 shadow-sm"
+                        >
+                          {generatingDraft === msg.id ? (
+                            <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Generating Draft...</>
+                          ) : (
+                            <><Sparkles className="w-3.5 h-3.5" /> Generate AI Draft</>
+                          )}
                         </button>
                       </div>
                     )}

@@ -84,15 +84,18 @@ export async function POST(
       metadata: { sequence_id }
     })
 
-    // Try to generate draft asynchronously (works locally, might be killed on Vercel but cron job will catch it)
-    import('@/lib/ai').then(({ runFollowupAgent }) => {
-      runFollowupAgent(lead, 1, steps.length, step1.custom_message).then(async (msg) => {
-        if (msg) {
-          const adminSupabase = (await import('@/lib/supabase/server')).createAdminClient()
-          await adminSupabase.from('followup_enrollments').update({ draft_message: msg }).eq('id', enrollment.id)
-        }
-      }).catch(console.error)
-    })
+    // Generate draft synchronously for step 1 so it appears instantly in the UI
+    try {
+      const { runFollowupAgent } = await import('@/lib/ai')
+      const msg = await runFollowupAgent(lead, 1, steps.length, step1.custom_message)
+      if (msg) {
+        const adminSupabase = (await import('@/lib/supabase/server')).createAdminClient()
+        await adminSupabase.from('followup_enrollments').update({ draft_message: msg }).eq('id', enrollment.id)
+        enrollment.draft_message = msg // update the returned object
+      }
+    } catch (error) {
+      console.error('Failed to generate initial draft:', error)
+    }
   }
 
   return NextResponse.json({ data: enrollment }, { status: 201 })

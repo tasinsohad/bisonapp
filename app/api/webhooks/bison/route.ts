@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 3. Return 200 immediately — process async
-  processWebhookAsync(body, eventType, settings, logId).catch(console.error)
+  // 3. Await processing before returning 200 so Vercel doesn't kill the function
+  await processWebhookAsync(body, eventType, settings, logId).catch(console.error)
 
   return NextResponse.json({ received: true }, { status: 200 })
 }

@@ -103,7 +103,7 @@ function parseAgentJSON(raw: string): AgentAction | null {
  * Triggered by webhook. Reads conversation from Bison API,
  * cleans thread, runs through OpenAI, executes the decided action.
  */
-export async function runAppointmentSetter(leadId: string): Promise<boolean> {
+export async function runAppointmentSetter(leadId: string, queueId?: string): Promise<boolean> {
   const supabase = createAdminClient()
   const settings = await getSettings()
 
@@ -226,19 +226,59 @@ export async function runAppointmentSetter(leadId: string): Promise<boolean> {
 
   if (!parsedAction) {
     console.error('Failed to parse appointment setter response after retry')
+    if (queueId) {
+      await supabase.from('reply_queue').update({ status: 'failed' }).eq('id', queueId)
+    }
     return false
   }
 
-  // Execute the action
+  // If a queueId is provided, we save the draft and stop here.
+  // Exception: If the action is DONE, we can just execute it immediately to cancel follow-ups
+  // and mark the lead as done, since no email is being sent anyway.
+  if (queueId && parsedAction.action !== 'DONE') {
+    await supabase.from('reply_queue').update({
+      status: 'pending',
+      draft_message: parsedAction.message,
+      action_payload: parsedAction
+    }).eq('id', queueId)
+    
+    // Also notify activity feed that draft is ready
+    await supabase.from('activity_feed').insert({
+      lead_id: leadId,
+      lead_email: lead.email,
+      lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
+      event_type: 'status_changed',
+      description: `AI draft generated and pending review/send.`,
+    })
+
+    return true
+  }
+
+  // Execute the action (Immediate Send)
+  return await executeAgentAction(supabase, settings, leadId, lead, parsedAction, parsedAction.message, queueId)
+}
+
+/**
+ * Executes a parsed AI action (used for immediate sends and processing drafted queues)
+ */
+async function executeAgentAction(
+  supabase: any,
+  settings: any,
+  leadId: string,
+  lead: Lead,
+  parsedAction: AgentAction,
+  messageTextToSend: string,
+  queueId?: string
+): Promise<boolean> {
   switch (parsedAction.action) {
     case 'SEND_LINK':
     case 'ASK_TIME':
     case 'REPLY_ONLY': {
-      const result = await sendBisonEmail({ lead, messageText: parsedAction.message })
+      const result = await sendBisonEmail({ lead, messageText: messageTextToSend })
 
       if (result.success) {
         // Append outbound message to conversation
-        await appendOutboundMessage(supabase, lead, parsedAction.message)
+        await appendOutboundMessage(supabase, lead, messageTextToSend)
 
         // Update status for SEND_LINK and ASK_TIME
         if (parsedAction.action !== 'REPLY_ONLY') {
@@ -324,9 +364,9 @@ export async function runAppointmentSetter(leadId: string): Promise<boolean> {
       }
 
       // Send confirmation email
-      const result = await sendBisonEmail({ lead, messageText: parsedAction.message })
+      const result = await sendBisonEmail({ lead, messageText: messageTextToSend })
       if (result.success) {
-        await appendOutboundMessage(supabase, lead, parsedAction.message)
+        await appendOutboundMessage(supabase, lead, messageTextToSend)
 
         // Update lead status
         await supabase.from('leads').update({
@@ -384,6 +424,48 @@ export async function runAppointmentSetter(leadId: string): Promise<boolean> {
     default:
       return false
   }
+}
+
+/**
+ * Execute a drafted reply from the queue
+ */
+export async function executeDraftedQueueItem(queueId: string): Promise<boolean> {
+  const supabase = createAdminClient()
+  const settings = await getSettings()
+
+  const { data: queueItem, error: queueError } = await supabase
+    .from('reply_queue')
+    .select('*, leads(*)')
+    .eq('id', queueId)
+    .single()
+
+  if (queueError || !queueItem || !queueItem.leads || !queueItem.action_payload) {
+    console.error('Failed to load queue item for execution:', queueError)
+    await supabase.from('reply_queue').update({ status: 'failed' }).eq('id', queueId)
+    return false
+  }
+
+  const parsedAction = queueItem.action_payload as AgentAction
+  const messageTextToSend = queueItem.draft_message || parsedAction.message
+
+  // Execute
+  const success = await executeAgentAction(
+    supabase, 
+    settings, 
+    queueItem.lead_id, 
+    queueItem.leads, 
+    parsedAction, 
+    messageTextToSend,
+    queueId
+  )
+
+  if (success) {
+    await supabase.from('reply_queue').update({ status: 'completed' }).eq('id', queueId)
+  } else {
+    await supabase.from('reply_queue').update({ status: 'failed' }).eq('id', queueId)
+  }
+
+  return success
 }
 
 /**

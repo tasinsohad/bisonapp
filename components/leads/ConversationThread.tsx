@@ -11,6 +11,8 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
   const [triggering, setTriggering] = useState(false)
   const [reschedulingItem, setReschedulingItem] = useState<{id: string, type: string, date: string} | null>(null)
   const [rescheduling, setRescheduling] = useState(false)
+  const [editingDraft, setEditingDraft] = useState<{id: string, type: string, text: string} | null>(null)
+  const [savingDraft, setSavingDraft] = useState(false)
   const { toast } = useToast()
 
   const messages = lead.conversations?.[0]?.messages || []
@@ -23,7 +25,7 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
       id: q.id,
       type: 'ai_reply',
       timestamp: q.send_after,
-      content: 'AI will draft and send a reply...',
+      content: q.draft_message || (q.status === 'drafting' ? 'AI is drafting a reply...' : 'AI will send a generated reply...'),
       status: q.status
     }))
 
@@ -34,7 +36,7 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
     id: activeEnrollment.id,
     type: 'followup',
     timestamp: activeEnrollment.next_send_at,
-    content: `Scheduled Follow-up (Step ${activeEnrollment.current_step}) from "${activeEnrollment.followup_sequences?.name || 'Sequence'}"`,
+    content: activeEnrollment.draft_message || `Scheduled Follow-up (Step ${activeEnrollment.current_step}) from "${activeEnrollment.followup_sequences?.name || 'Sequence'}". Generating draft...`,
     status: 'pending'
   }] : []
 
@@ -93,6 +95,34 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
       toast(e.message, 'error')
     } finally {
       setRescheduling(false)
+    }
+  }
+
+  const handleSaveDraft = async () => {
+    if (!editingDraft) return
+    setSavingDraft(true)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/edit-draft`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingDraft.id,
+          type: editingDraft.type,
+          newDraftMessage: editingDraft.text
+        })
+      })
+      if (res.ok) {
+        toast('Draft saved successfully', 'success')
+        setEditingDraft(null)
+        fetchLead()
+      } else {
+        const data = await res.json()
+        toast(data.error || 'Failed to save draft', 'error')
+      }
+    } catch(e: any) {
+      toast(e.message, 'error')
+    } finally {
+      setSavingDraft(false)
     }
   }
 
@@ -192,9 +222,32 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                         Status: <span className={`font-semibold ${msg.status === 'failed' ? 'text-rose-600' : ''}`}>{msg.status}</span>
                       </span>
                     </div>
-                    <div className="text-sm leading-relaxed text-indigo-900 italic mt-1">
-                      {msg.content}
-                    </div>
+                    {editingDraft?.id === msg.id && editingDraft?.type === msg.type ? (
+                      <div className="mt-2 w-full text-left">
+                        <textarea 
+                          value={editingDraft?.text || ''}
+                          onChange={e => setEditingDraft(prev => prev ? {...prev, text: e.target.value} : null)}
+                          rows={6}
+                          className="w-full text-sm p-3 border border-indigo-200 rounded-md focus:ring-1 focus:ring-indigo-500 bg-white shadow-inner"
+                        />
+                        <div className="flex justify-end gap-2 mt-2">
+                          <button onClick={() => setEditingDraft(null)} className="px-3 py-1.5 text-xs bg-slate-100 rounded-md text-slate-600 hover:bg-slate-200 transition-colors font-medium">Cancel</button>
+                          <button onClick={handleSaveDraft} disabled={savingDraft} className="px-3 py-1.5 text-xs bg-indigo-600 rounded-md text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors font-medium">
+                            {savingDraft ? 'Saving...' : 'Save Draft'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm leading-relaxed text-indigo-900 mt-2 relative group w-full text-left bg-white/50 rounded-lg p-3 border border-indigo-100">
+                        {msg.content}
+                        <button 
+                          onClick={() => setEditingDraft({id: msg.id, type: msg.type, text: msg.content})}
+                          className="absolute -top-2.5 -right-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow hover:bg-indigo-50 font-medium"
+                        >
+                          Edit Draft
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )

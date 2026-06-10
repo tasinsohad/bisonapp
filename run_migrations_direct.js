@@ -15,10 +15,11 @@ async function runMigrations() {
     await client.connect();
     console.log("✅ Connected to Supabase PostgreSQL database");
 
-    // Update setting to 5
-    console.log("⏳ Updating inbound_reply_delay_minutes to 5...");
-    await client.query("UPDATE settings SET value = '5' WHERE key = 'inbound_reply_delay_minutes'");
-    console.log("✅ Successfully updated setting to 5");
+    const migrationPath = path.join(__dirname, 'supabase', 'migrations', '004_add_draft_messages.sql');
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    console.log("⏳ Running 004 migration...");
+    await client.query(sql);
+    console.log("✅ Successfully ran migration");
 
   } catch (err) {
     console.error("❌ Migration failed:", err);

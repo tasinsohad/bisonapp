@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSettings } from '@/lib/settings'
 import { calculateNextSendAt, isWithinSendWindow, isWeekend } from '@/lib/followup-scheduler'
-import { runFollowupAgent, runAppointmentSetter } from '@/lib/ai'
+import { runFollowupAgent, executeDraftedQueueItem } from '@/lib/ai'
 import { sendBisonEmail } from '@/lib/send-email'
 import { syncLeadThread } from '@/lib/bison-sync'
 
@@ -44,9 +44,8 @@ async function processCron(request: NextRequest) {
       if (Date.now() - startTime > MAX_EXECUTION_TIME) break;
       await supabase.from('reply_queue').update({ status: 'processing', updated_at: new Date().toISOString() }).eq('id', item.id)
       try {
-        const success = await runAppointmentSetter(item.lead_id)
-        const finalStatus = success ? 'completed' : 'failed'
-        await supabase.from('reply_queue').update({ status: finalStatus, updated_at: new Date().toISOString() }).eq('id', item.id)
+        const success = await executeDraftedQueueItem(item.id)
+        // executeDraftedQueueItem handles updating the status.
       } catch (err) {
         console.error(`Failed to process queued reply ${item.id}:`, err)
         await supabase.from('reply_queue').update({ status: 'failed', updated_at: new Date().toISOString() }).eq('id', item.id)
@@ -162,8 +161,8 @@ async function processCron(request: NextRequest) {
       continue
     }
 
-    // e. Get message (custom or AI)
-    const message = await runFollowupAgent(
+    // e. Get message (use draft if available, otherwise generate fallback)
+    const message = enrollment.draft_message || await runFollowupAgent(
       lead,
       enrollment.current_step,
       steps.length,
@@ -213,9 +212,22 @@ async function processCron(request: NextRequest) {
       const nextStepConfig = steps[enrollment.current_step]
       let newStatus = 'active'
       let newNextSendAt = null
+      let newDraftMessage = null
 
       if (nextStepConfig) {
         newNextSendAt = calculateNextSendAt(nextStepConfig, timezone, windowStart, windowEnd).toISOString()
+        // Generate draft for the next step immediately
+        const nextMessage = await runFollowupAgent(
+          lead,
+          enrollment.current_step + 1,
+          steps.length,
+          nextStepConfig.custom_message
+        )
+        if (nextMessage) {
+          newDraftMessage = nextMessage
+        } else {
+          newStatus = 'completed' // AI said done
+        }
       } else {
         newStatus = 'completed'
       }
@@ -224,6 +236,7 @@ async function processCron(request: NextRequest) {
         current_step: enrollment.current_step + 1,
         status: newStatus,
         next_send_at: newNextSendAt,
+        draft_message: newDraftMessage,
         updated_at: new Date().toISOString()
       }).eq('id', enrollment.id)
 

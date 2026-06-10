@@ -72,7 +72,7 @@ export async function POST(
   }
 
   // Log activity
-  const { data: lead } = await supabase.from('leads').select('email, first_name, last_name').eq('id', params.id).single()
+  const { data: lead } = await supabase.from('leads').select('*').eq('id', params.id).single()
   
   if (lead) {
     await supabase.from('activity_feed').insert({
@@ -82,6 +82,16 @@ export async function POST(
       event_type: 'followup_enrolled',
       description: 'Enrolled in follow-up sequence',
       metadata: { sequence_id }
+    })
+
+    // Generate draft asynchronously
+    import('@/lib/ai').then(({ runFollowupAgent }) => {
+      runFollowupAgent(lead, 1, steps.length, step1.custom_message).then(async (msg) => {
+        if (msg) {
+          const adminSupabase = (await import('@/lib/supabase/server')).createAdminClient()
+          await adminSupabase.from('followup_enrollments').update({ draft_message: msg }).eq('id', enrollment.id)
+        }
+      }).catch(console.error)
     })
   }
 

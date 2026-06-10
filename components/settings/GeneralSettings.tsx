@@ -112,6 +112,39 @@ export function GeneralSettings({ settings, setSettings, onSave }: any) {
             className="w-full max-w-[120px] px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
           />
         </div>
+
+        <div className="sm:col-span-4 mt-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Workspace Timezone</label>
+          <p className="text-xs text-slate-500 mb-2">This timezone is used to determine when automated follow-ups and emails should be sent during the configured sending window.</p>
+          <select
+            value={settings.app_timezone || 'America/New_York'}
+            onChange={(e) => setSettings({ ...settings, app_timezone: e.target.value })}
+            className="w-full max-w-[300px] px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+          >
+            <optgroup label="US & Canada">
+              <option value="America/New_York">Eastern Time (US & Canada)</option>
+              <option value="America/Chicago">Central Time (US & Canada)</option>
+              <option value="America/Denver">Mountain Time (US & Canada)</option>
+              <option value="America/Los_Angeles">Pacific Time (US & Canada)</option>
+              <option value="America/Anchorage">Alaska</option>
+              <option value="Pacific/Honolulu">Hawaii</option>
+            </optgroup>
+            <optgroup label="Europe">
+              <option value="Europe/London">London</option>
+              <option value="Europe/Paris">Central European Time (Paris)</option>
+              <option value="Europe/Helsinki">Eastern European Time (Helsinki)</option>
+            </optgroup>
+            <optgroup label="Asia & Pacific">
+              <option value="Asia/Dubai">Dubai</option>
+              <option value="Asia/Dhaka">Dhaka (Bangladesh Standard Time)</option>
+              <option value="Asia/Kolkata">India Standard Time</option>
+              <option value="Asia/Singapore">Singapore</option>
+              <option value="Asia/Tokyo">Tokyo</option>
+              <option value="Australia/Sydney">Sydney</option>
+              <option value="Pacific/Auckland">Auckland</option>
+            </optgroup>
+          </select>
+        </div>
       </div>
 
       <div className="pt-2">

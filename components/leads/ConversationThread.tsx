@@ -17,7 +17,7 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
 
   // Pending AI Replies
   const pendingReplies = (lead.reply_queue || [])
-    .filter((q: any) => q.status === 'pending' || q.status === 'processing')
+    .filter((q: any) => ['pending', 'processing', 'failed'].includes(q.status))
     .map((q: any) => ({
       isPending: true,
       id: q.id,
@@ -35,10 +35,11 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
     type: 'followup',
     timestamp: activeEnrollment.next_send_at,
     content: `Scheduled Follow-up (Step ${activeEnrollment.current_step}) from "${activeEnrollment.followup_sequences?.name || 'Sequence'}"`,
+    status: 'pending'
   }] : []
 
   // Combine and sort
-  const allThreadItems = [...messages.map((m: any) => ({...m, isPending: false})), ...pendingReplies, ...pendingFollowups]
+  const allThreadItems = [...messages.map((m: any) => ({...m, isPending: false, status: 'sent'})), ...pendingReplies, ...pendingFollowups]
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 
   const handleSend = async () => {
@@ -187,6 +188,9 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                     </div>
                     <div className="flex items-center text-[10px] mb-2 uppercase tracking-wider text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full w-max mt-2">
                       <Bot className="w-3 h-3 mr-1" /> {msg.type === 'ai_reply' ? 'AI Reply Queue' : 'Automated Sequence'}
+                      <span className="ml-2 border-l border-indigo-200 pl-2">
+                        Status: <span className={`font-semibold ${msg.status === 'failed' ? 'text-rose-600' : ''}`}>{msg.status}</span>
+                      </span>
                     </div>
                     <div className="text-sm leading-relaxed text-indigo-900 italic mt-1">
                       {msg.content}
@@ -212,8 +216,11 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                   </div>
                   
                   {msg.source === 'agent' && (
-                    <div className="flex items-center text-[10px] mb-2 uppercase tracking-wider text-indigo-200 bg-indigo-800/50 px-2 py-0.5 rounded-full w-max">
+                    <div className={`flex items-center text-[10px] mb-2 uppercase tracking-wider px-2 py-0.5 rounded-full w-max ${
+                      isInbound ? 'text-indigo-600 bg-indigo-100/50' : 'text-indigo-200 bg-indigo-800/50'
+                    }`}>
                       <Bot className="w-3 h-3 mr-1" /> AI Generated
+                      <span className={`ml-2 border-l pl-2 ${isInbound ? 'border-indigo-200' : 'border-indigo-700'}`}>Status: SENT</span>
                     </div>
                   )}
 

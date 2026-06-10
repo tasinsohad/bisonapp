@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSettings } from '@/lib/settings'
 import { calculateNextSendAt, isWithinSendWindow, isWeekend } from '@/lib/followup-scheduler'
-import { runFollowupAgent, executeDraftedQueueItem } from '@/lib/ai'
+import { runFollowupAgent, executeDraftedQueueItem, runAppointmentSetter } from '@/lib/ai'
 import { sendBisonEmail } from '@/lib/send-email'
 import { syncLeadThread } from '@/lib/bison-sync'
 
@@ -31,7 +31,27 @@ async function processCron(request: NextRequest) {
   const startTime = Date.now()
   const MAX_EXECUTION_TIME = 45000
 
-  // 0. Process queued inbound replies
+  // 0. Process queued inbound replies that need drafting
+  const { data: draftingReplies } = await supabase
+    .from('reply_queue')
+    .select('id, lead_id')
+    .eq('status', 'drafting')
+    .limit(10)
+    
+  if (draftingReplies && draftingReplies.length > 0) {
+    for (const item of draftingReplies) {
+      if (Date.now() - startTime > MAX_EXECUTION_TIME) break;
+      await supabase.from('reply_queue').update({ status: 'processing', updated_at: new Date().toISOString() }).eq('id', item.id)
+      try {
+        await runAppointmentSetter(item.lead_id, item.id)
+      } catch (err) {
+        console.error(`Failed to draft queued reply ${item.id}:`, err)
+        await supabase.from('reply_queue').update({ status: 'failed', updated_at: new Date().toISOString() }).eq('id', item.id)
+      }
+    }
+  }
+
+  // 0.5 Process queued inbound replies that are ready to send
   const { data: queuedReplies } = await supabase
     .from('reply_queue')
     .select('id, lead_id')
@@ -53,7 +73,41 @@ async function processCron(request: NextRequest) {
     }
   }
 
-  // 1. Get due enrollments
+  // 1. Process missing drafts for enrollments
+  const { data: missingDraftEnrollments } = await supabase
+    .from('followup_enrollments')
+    .select('*, leads(*), followup_sequences(*)')
+    .eq('status', 'active')
+    .is('draft_message', null)
+    .limit(10)
+
+  if (missingDraftEnrollments && missingDraftEnrollments.length > 0) {
+    for (const enrollment of missingDraftEnrollments) {
+      if (Date.now() - startTime > MAX_EXECUTION_TIME) break;
+      const lead = enrollment.leads
+      const sequence = enrollment.followup_sequences
+      const steps = sequence.steps as any[]
+      const currentStepConfig = steps[enrollment.current_step - 1]
+      
+      try {
+        const message = await runFollowupAgent(
+          lead,
+          enrollment.current_step,
+          steps.length,
+          currentStepConfig?.custom_message
+        )
+        if (message) {
+          await supabase.from('followup_enrollments').update({ draft_message: message }).eq('id', enrollment.id)
+        } else {
+          await supabase.from('followup_enrollments').update({ status: 'completed' }).eq('id', enrollment.id)
+        }
+      } catch (e) {
+        console.error('Failed to generate draft', e)
+      }
+    }
+  }
+
+  // 2. Get due enrollments that HAVE drafts
   const { data: enrollments, error } = await supabase
     .from('followup_enrollments')
     .select(`
@@ -62,6 +116,7 @@ async function processCron(request: NextRequest) {
       followup_sequences(*)
     `)
     .eq('status', 'active')
+    .not('draft_message', 'is', null)
     .lte('next_send_at', new Date().toISOString())
     .limit(20)
 
@@ -161,15 +216,10 @@ async function processCron(request: NextRequest) {
       continue
     }
 
-    // e. Get message (use draft if available, otherwise generate fallback)
-    const message = enrollment.draft_message || await runFollowupAgent(
-      lead,
-      enrollment.current_step,
-      steps.length,
-      currentStepConfig.custom_message
-    )
+    // e. Get message (must be available)
+    const message = enrollment.draft_message
 
-    // f. If Done signal
+    // f. If Done signal (should not happen if draft exists, but just in case)
     if (!message) {
       await updateEnrollmentStatus(supabase, enrollment.id, 'completed')
       continue

@@ -338,27 +338,23 @@ async function handleReply(
     }).catch(console.error)
   }
 
-  // ===== TRIGGER OR QUEUE APPOINTMENT SETTER =====
+  // ===== QUEUE APPOINTMENT SETTER =====
   const delayMinutes = parseInt(settings.inbound_reply_delay_minutes || '5')
-  if (delayMinutes > 0) {
-    const sendAfter = new Date(Date.now() + delayMinutes * 60000).toISOString()
-    await supabase.from('reply_queue').insert({
-      lead_id: leadId,
-      status: 'pending',
-      send_after: sendAfter
-    })
-    
-    await supabase.from('activity_feed').insert({
-      lead_id: leadId,
-      lead_email: leadEmail,
-      lead_name: [firstName, lastName].filter(Boolean).join(' '),
-      event_type: 'status_changed',
-      description: `AI reply queued for sending in ${delayMinutes} minutes`,
-    })
-  } else {
-    // Run instantly
-    runAppointmentSetter(leadId).catch(console.error)
-  }
+  const sendAfter = new Date(Date.now() + delayMinutes * 60000).toISOString()
+  
+  await supabase.from('reply_queue').insert({
+    lead_id: leadId,
+    status: 'drafting',
+    send_after: sendAfter
+  })
+  
+  await supabase.from('activity_feed').insert({
+    lead_id: leadId,
+    lead_email: leadEmail,
+    lead_name: [firstName, lastName].filter(Boolean).join(' '),
+    event_type: 'status_changed',
+    description: `AI reply queued for drafting. Will be sent in ${delayMinutes} minutes`,
+  })
 }
 
 async function handleUnsubscribe(supabase: any, data: any) {

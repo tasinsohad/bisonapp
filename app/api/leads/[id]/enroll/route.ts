@@ -83,6 +83,16 @@ export async function POST(
       description: 'Enrolled in follow-up sequence',
       metadata: { sequence_id }
     })
+
+    // Try to generate draft asynchronously (works locally, might be killed on Vercel but cron job will catch it)
+    import('@/lib/ai').then(({ runFollowupAgent }) => {
+      runFollowupAgent(lead, 1, steps.length, step1.custom_message).then(async (msg) => {
+        if (msg) {
+          const adminSupabase = (await import('@/lib/supabase/server')).createAdminClient()
+          await adminSupabase.from('followup_enrollments').update({ draft_message: msg }).eq('id', enrollment.id)
+        }
+      }).catch(console.error)
+    })
   }
 
   return NextResponse.json({ data: enrollment }, { status: 201 })

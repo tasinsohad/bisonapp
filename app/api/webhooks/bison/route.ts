@@ -338,15 +338,14 @@ async function handleReply(
     }).catch(console.error)
   }
 
-  // ===== QUEUE APPOINTMENT SETTER =====
   const delayMinutes = parseInt(settings.inbound_reply_delay_minutes || '5')
   const sendAfter = new Date(Date.now() + delayMinutes * 60000).toISOString()
   
-  await supabase.from('reply_queue').insert({
+  const { data: queue } = await supabase.from('reply_queue').insert({
     lead_id: leadId,
     status: 'drafting',
     send_after: sendAfter
-  })
+  }).select('id').single()
   
   await supabase.from('activity_feed').insert({
     lead_id: leadId,
@@ -355,6 +354,11 @@ async function handleReply(
     event_type: 'status_changed',
     description: `AI reply queued for drafting. Will be sent in ${delayMinutes} minutes`,
   })
+
+  // Try to generate draft asynchronously (works locally, might be killed on Vercel but cron job will catch it)
+  if (queue) {
+    runAppointmentSetter(leadId, queue.id).catch(console.error)
+  }
 }
 
 async function handleUnsubscribe(supabase: any, data: any) {

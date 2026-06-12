@@ -1,15 +1,16 @@
 'use client'
 
 import { Save, RotateCcw } from 'lucide-react'
+import { DEFAULT_APPT_SETTER_PROMPT, DEFAULT_FOLLOWUP_PROMPT } from '@/lib/default-prompts'
 
 export function PromptsSettings({ settings, setSettings, onSave }: any) {
   
   const resetPrompts = () => {
-    if(confirm('Are you sure you want to reset to default prompts?')) {
+    if(confirm('Are you sure you want to reset to default prompts? This will replace both prompts with the O Growth Labs V2 templates.')) {
       setSettings({
         ...settings,
-        appt_setter_system_prompt: 'You are an AI sales assistant...', // Truncated for brevity, normally you'd put the default here
-        followup_agent_system_prompt: 'You are an AI sales assistant...'
+        appt_setter_system_prompt: DEFAULT_APPT_SETTER_PROMPT,
+        followup_agent_system_prompt: DEFAULT_FOLLOWUP_PROMPT,
       })
     }
   }
@@ -30,23 +31,26 @@ export function PromptsSettings({ settings, setSettings, onSave }: any) {
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">Appointment Setter Prompt</label>
           <div className="bg-slate-50 border border-slate-200 rounded-t-lg p-3 text-xs font-mono text-slate-600">
-            Available variables: {'{{lead.first_name}}'}, {'{{lead.company}}'}, {'{{calendar_link}}'}, {'{{bison_sender_email_name}}'}
+            Available variables: {'{{leadFirstName}}'}, {'{{leadName}}'}, {'{{leadCompany}}'}, {'{{leadIndustry}}'}, {'{{leadTitle}}'}, {'{{leadWebsite}}'}, {'{{leadCountry}}'}, {'{{calLink}}'}, {'{{senderName}}'}, {'{{senderEmail}}'}, {'{{campaignName}}'}, {'{{companyResearch}}'}, {'{{conversationThread}}'}
           </div>
           <textarea
             value={settings.appt_setter_system_prompt || ''}
             onChange={(e) => setSettings({ ...settings, appt_setter_system_prompt: e.target.value })}
-            rows={10}
+            rows={16}
             className="w-full px-4 py-3 font-mono text-sm bg-slate-900 text-slate-300 rounded-b-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">Follow-up Agent Prompt</label>
+          <div className="bg-slate-50 border border-slate-200 rounded-t-lg p-3 text-xs font-mono text-slate-600">
+            Available variables: {'{{leadFirstName}}'}, {'{{leadName}}'}, {'{{leadCompany}}'}, {'{{leadIndustry}}'}, {'{{senderName}}'}, {'{{companyResearch}}'}, {'{{conversationThread}}'}, {'{{stepNumber}}'}, {'{{totalSteps}}'}
+          </div>
           <textarea
             value={settings.followup_agent_system_prompt || ''}
             onChange={(e) => setSettings({ ...settings, followup_agent_system_prompt: e.target.value })}
-            rows={8}
-            className="w-full px-4 py-3 font-mono text-sm bg-slate-900 text-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            rows={10}
+            className="w-full px-4 py-3 font-mono text-sm bg-slate-900 text-slate-300 rounded-b-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
       </div>

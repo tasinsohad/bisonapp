@@ -61,6 +61,7 @@ function injectVariables(
   const companyResearch = (lead.custom_variables || []).find((v: any) => v.name === 'company_research')?.value || 'Not available'
 
   return template
+    .replace(/\{\{leadFirstName\}\}/g, lead.first_name || lead.email.split('@')[0])
     .replace(/\{\{leadName\}\}/g, [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.email)
     .replace(/\{\{leadEmail\}\}/g, lead.email)
     .replace(/\{\{leadCompany\}\}/g, companyName)

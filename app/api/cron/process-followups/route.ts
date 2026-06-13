@@ -110,9 +110,8 @@ async function processCron(request: NextRequest) {
   }
 
   // ──────────────────────────────────────────────────────────────
-  // STEP 0.1: AUTO-ENROLL UNRESPONSIVE LEADS
+  // STEP 0.1: AUTO-ENROLL LEADS (Immediate Enrollment with Countdown)
   // ──────────────────────────────────────────────────────────────
-  const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60000).toISOString()
   
   // Find leads that are engaged and have no active followups
   const { data: unresponsiveCandidates } = await supabase
@@ -142,15 +141,19 @@ async function processCron(request: NextRequest) {
           const messages = lead.conversations[0].messages || []
           if (messages.length > 0) {
             const lastMessage = messages[messages.length - 1]
-            // If last message was outbound and older than 2 days
-            if (lastMessage.role === 'outbound' && new Date(lastMessage.timestamp).getTime() < new Date(twoDaysAgo).getTime()) {
+            // If last message was outbound, enroll them immediately!
+            // We use the timestamp of that message to calculate the 48-hour countdown.
+            if (lastMessage.role === 'outbound') {
               // Enroll them
               const timezone = settings.app_timezone || 'America/New_York'
               const windowStart = parseInt(settings.send_window_start || '9')
               const windowEnd = parseInt(settings.send_window_end || '18')
               
               const step1 = (defaultSeq.steps as any[])[0]
-              const nextSendAt = calculateNextSendAt(step1, timezone, windowStart, windowEnd)
+              
+              // Use the outbound message timestamp as the base date for the countdown
+              const baseDate = new Date(lastMessage.timestamp)
+              const nextSendAt = calculateNextSendAt(step1, timezone, windowStart, windowEnd, baseDate)
 
               const { data: newEnrollment } = await supabase
                 .from('followup_enrollments')
@@ -170,7 +173,7 @@ async function processCron(request: NextRequest) {
                   lead_email: lead.email,
                   lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
                   event_type: 'followup_enrolled',
-                  description: 'Automatically enrolled in follow-up sequence after 48h of inactivity',
+                  description: 'Automatically enrolled in follow-up sequence with countdown based on last outbound message',
                   metadata: { source: 'auto_enrollment' }
                 })
 

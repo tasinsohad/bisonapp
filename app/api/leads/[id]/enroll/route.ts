@@ -100,3 +100,6 @@ export async function POST(
 
   return NextResponse.json({ data: enrollment }, { status: 201 })
 }
+
+// Allow up to 60 seconds for the AI to prepare the draft synchronously
+export const maxDuration = 60

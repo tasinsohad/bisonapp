@@ -4,7 +4,53 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { useToast } from '@/components/shared/Toast'
-import { Play, Pause, XCircle, Plus, Clock } from 'lucide-react'
+import { Play, Pause, XCircle, Plus, Clock, Timer, Bot, RefreshCw, Edit2 } from 'lucide-react'
+
+/**
+ * Live countdown hook
+ */
+function useCountdown(targetDate: string | null) {
+  const [timeLeft, setTimeLeft] = useState('')
+
+  useEffect(() => {
+    if (!targetDate) {
+      setTimeLeft('')
+      return
+    }
+
+    const update = () => {
+      const now = Date.now()
+      const target = new Date(targetDate).getTime()
+      const diff = target - now
+
+      if (diff <= 0) {
+        setTimeLeft('due')
+        return
+      }
+
+      const hours = Math.floor(diff / 3600000)
+      const minutes = Math.floor((diff % 3600000) / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+
+      if (hours > 24) {
+        const days = Math.floor(hours / 24)
+        setTimeLeft(`${days}d ${hours % 24}h`)
+      } else if (hours > 0) {
+        setTimeLeft(`${hours}h ${minutes}m`)
+      } else if (minutes > 0) {
+        setTimeLeft(`${minutes}m ${seconds}s`)
+      } else {
+        setTimeLeft(`${seconds}s`)
+      }
+    }
+
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [targetDate])
+
+  return timeLeft
+}
 
 export function FollowupPanel({ lead, fetchLead }: { lead: any, fetchLead: any }) {
   const [sequences, setSequences] = useState<any[]>([])
@@ -22,6 +68,7 @@ export function FollowupPanel({ lead, fetchLead }: { lead: any, fetchLead: any }
 
   const enrollments = lead.followup_enrollments || []
   const activeEnrollment = enrollments.find((e: any) => e.status === 'active' || e.status === 'paused')
+  const countdown = useCountdown(activeEnrollment?.next_send_at || null)
 
   const handleEnroll = async () => {
     if (!selectedSequence) return
@@ -153,12 +200,47 @@ export function FollowupPanel({ lead, fetchLead }: { lead: any, fetchLead: any }
                   {activeEnrollment.current_step} <span className="text-lg text-slate-400 font-normal">/ {activeEnrollment.followup_sequences.steps.length}</span>
                 </div>
               </div>
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 flex flex-col justify-center">
                 <div className="text-xs text-slate-500 mb-1">Next Send Time</div>
-                <div className="text-sm font-medium text-slate-800">
+                <div className="text-sm font-medium text-slate-800 mb-1">
                   {activeEnrollment.next_send_at ? format(new Date(activeEnrollment.next_send_at), 'MMM d, yyyy h:mm a') : 'N/A'}
                 </div>
+                {activeEnrollment.status === 'active' && activeEnrollment.next_send_at && (
+                  <div className="flex items-center gap-1.5 text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full text-xs font-medium tabular-nums w-max mt-1">
+                    <Timer className="w-3 h-3" />
+                    {countdown === 'due' ? 'Sending shortly...' : `Sending in ${countdown}`}
+                  </div>
+                )}
               </div>
+            </div>
+
+            {/* AI Draft Preview Section */}
+            <div className="mb-8 relative bg-indigo-50/50 rounded-xl border border-indigo-100 p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-3 pb-3 border-b border-indigo-100">
+                <div className="bg-indigo-100 p-1.5 rounded-lg text-indigo-600">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <h4 className="font-semibold text-indigo-900 text-sm">Next Scheduled Message</h4>
+                {activeEnrollment.status === 'active' && (
+                  <span className="ml-auto text-xs font-medium text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                    Step {activeEnrollment.current_step}
+                  </span>
+                )}
+              </div>
+              
+              {activeEnrollment.draft_message ? (
+                <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-white p-4 rounded-lg border border-indigo-100 shadow-sm relative group">
+                  {activeEnrollment.draft_message}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <RefreshCw className="w-6 h-6 text-indigo-300 animate-spin mb-3" />
+                  <p className="text-sm font-medium text-indigo-900">AI is drafting the next message...</p>
+                  <p className="text-xs text-indigo-500 mt-1 max-w-sm">
+                    The AI is currently analyzing the lead's website and history to write the perfect follow-up. This usually takes a few seconds.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="relative border-l-2 border-indigo-100 ml-4 pl-6 space-y-6">

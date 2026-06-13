@@ -355,9 +355,9 @@ async function handleReply(
     description: `AI reply queued for drafting. Will be sent in ${delayMinutes} minutes`,
   })
 
-  // Try to generate draft asynchronously (works locally, might be killed on Vercel but cron job will catch it)
+  // Generate draft synchronously so it appears instantly in the UI before Vercel returns
   if (queue) {
-    runAppointmentSetter(leadId, queue.id).catch(console.error)
+    await runAppointmentSetter(leadId, queue.id).catch(console.error)
   }
 }
 
@@ -427,3 +427,6 @@ export const runtime = 'nodejs'
 
 // Disable body parsing to access raw body for HMAC
 export const dynamic = 'force-dynamic'
+
+// Allow up to 60 seconds for the AI to prepare the reply synchronously
+export const maxDuration = 60

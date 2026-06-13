@@ -39,9 +39,14 @@ export async function saveSettings(updates: Record<string, string>): Promise<voi
   const supabase = createServerClient()
 
   for (const [key, value] of Object.entries(updates)) {
-    await supabase
+    const { error } = await supabase
       .from('settings')
       .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+    
+    if (error) {
+      console.error(`Failed to save setting "${key}":`, error)
+      throw new Error(`Failed to save setting "${key}": ${error.message}`)
+    }
   }
 
   // Invalidate cache

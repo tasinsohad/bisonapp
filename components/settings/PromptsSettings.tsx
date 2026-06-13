@@ -1,17 +1,35 @@
 'use client'
 
-import { Save, RotateCcw } from 'lucide-react'
-import { DEFAULT_APPT_SETTER_PROMPT, DEFAULT_FOLLOWUP_PROMPT } from '@/lib/default-prompts'
+import { useState } from 'react'
+import { Save, RotateCcw, Loader2 } from 'lucide-react'
 
 export function PromptsSettings({ settings, setSettings, onSave }: any) {
+  const [resetting, setResetting] = useState(false)
   
-  const resetPrompts = () => {
-    if(confirm('Are you sure you want to reset to default prompts? This will replace both prompts with the O Growth Labs V2 templates.')) {
-      setSettings({
-        ...settings,
-        appt_setter_system_prompt: DEFAULT_APPT_SETTER_PROMPT,
-        followup_agent_system_prompt: DEFAULT_FOLLOWUP_PROMPT,
-      })
+  const resetPrompts = async () => {
+    if(!confirm('Are you sure you want to reset to default prompts? This will replace both prompts with the O Growth Labs V2 templates and save immediately.')) {
+      return
+    }
+    
+    setResetting(true)
+    try {
+      const res = await fetch('/api/settings/reset-prompts', { method: 'POST' })
+      const data = await res.json()
+      
+      if (data.success) {
+        setSettings({
+          ...settings,
+          appt_setter_system_prompt: data.appt_setter_system_prompt,
+          followup_agent_system_prompt: data.followup_agent_system_prompt,
+        })
+        alert('Prompts reset and saved successfully!')
+      } else {
+        alert('Failed to reset prompts: ' + (data.error || 'Unknown error'))
+      }
+    } catch (e: any) {
+      alert('Failed to reset prompts: ' + e.message)
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -22,8 +40,13 @@ export function PromptsSettings({ settings, setSettings, onSave }: any) {
           <h3 className="text-lg font-medium leading-6 text-slate-900">AI Prompts</h3>
           <p className="mt-1 text-sm text-slate-500">Customize the behavior of the Appointment Setter and Follow-up agents.</p>
         </div>
-        <button onClick={resetPrompts} className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center">
-          <RotateCcw className="w-4 h-4 mr-1" /> Reset to defaults
+        <button 
+          onClick={resetPrompts} 
+          disabled={resetting}
+          className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center disabled:opacity-50"
+        >
+          {resetting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RotateCcw className="w-4 h-4 mr-1" />}
+          {resetting ? 'Resetting...' : 'Reset to defaults'}
         </button>
       </div>
 

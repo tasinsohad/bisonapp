@@ -5,6 +5,7 @@ import { calculateNextSendAt, isWithinSendWindow, isWeekend } from '@/lib/follow
 import { runFollowupAgent, executeDraftedQueueItem, runAppointmentSetter } from '@/lib/ai'
 import { sendBisonEmail } from '@/lib/send-email'
 import { syncLeadThread } from '@/lib/bison-sync'
+import { getLeadReplies } from '@/lib/bison'
 
 export async function GET(request: NextRequest) {
   return processCron(request)
@@ -30,6 +31,79 @@ async function processCron(request: NextRequest) {
   // Vercel execution timeout guard (45 seconds)
   const startTime = Date.now()
   const MAX_EXECUTION_TIME = 45000
+
+  // ──────────────────────────────────────────────────────────────
+  // STEP 0: PROACTIVE REPLY CHECK via Bison API
+  //
+  // Before processing any follow-ups, poll the Bison API for all
+  // leads with active enrollments to detect replies that may have
+  // been missed by the webhook. If a reply is found:
+  //   → Pause the enrollment
+  //   → Queue the reply for AI processing
+  // This ensures no follow-up is sent to a lead who already replied.
+  // ──────────────────────────────────────────────────────────────
+  const { data: activeEnrollments } = await supabase
+    .from('followup_enrollments')
+    .select('id, lead_id, enrolled_at, current_step, leads(*)')
+    .eq('status', 'active')
+    .limit(30)
+
+  if (activeEnrollments && activeEnrollments.length > 0) {
+    for (const enrollment of activeEnrollments) {
+      if (Date.now() - startTime > MAX_EXECUTION_TIME) break
+      const lead = enrollment.leads as any
+      if (!lead || !lead.bison_reply_id) continue
+
+      try {
+        // Call Bison API to sync the full thread and detect new replies
+        const syncResult = await syncLeadThread(lead)
+        
+        if (syncResult.success && syncResult.hasNewReply) {
+          // syncLeadThread already pauses the enrollment when auto_pause_on_reply is on,
+          // syncs conversation messages, and updates the lead's bison_reply_id.
+          // Now we also need to queue this newly discovered reply for AI processing
+          // so the appointment setter can respond.
+
+          // Check if there's already a pending/drafting queue item for this lead
+          const { data: existingQueue } = await supabase
+            .from('reply_queue')
+            .select('id')
+            .eq('lead_id', lead.id)
+            .in('status', ['drafting', 'pending', 'processing'])
+            .maybeSingle()
+
+          if (!existingQueue) {
+            const delayMinutes = parseInt(settings.inbound_reply_delay_minutes || '5')
+            const sendAfter = new Date(Date.now() + delayMinutes * 60000).toISOString()
+
+            const { data: queue } = await supabase.from('reply_queue').insert({
+              lead_id: lead.id,
+              status: 'drafting',
+              send_after: sendAfter
+            }).select('id').single()
+
+            await supabase.from('activity_feed').insert({
+              lead_id: lead.id,
+              lead_email: lead.email,
+              lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
+              event_type: 'reply_received',
+              description: `Reply discovered via API poll (missed webhook). AI reply queued.`,
+              metadata: { source: 'cron_poll' },
+            })
+
+            // Kick off AI draft generation
+            if (queue) {
+              runAppointmentSetter(lead.id, queue.id).catch(console.error)
+            }
+          }
+
+          console.log(`[Reply Check] Lead ${lead.email}: reply found via API poll, enrollment paused`)
+        }
+      } catch (err) {
+        console.error(`[Reply Check] Failed for lead ${lead.id}:`, err)
+      }
+    }
+  }
 
   // 0. Process queued inbound replies that need drafting
   const { data: draftingReplies } = await supabase

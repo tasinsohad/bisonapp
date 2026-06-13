@@ -183,7 +183,7 @@ export async function runAppointmentSetter(leadId: string, queueId?: string): Pr
   try {
     const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: `Here is the current email thread:\n\n${conversationText}` },
+      { role: 'user', content: 'Analyze the email thread above and decide the best action. Respond with valid JSON only.' },
     ]
 
     // First attempt
@@ -606,7 +606,7 @@ async function callLLM(
         messages: userMessages,
         system: systemPrompt,
         max_tokens: 1000,
-        temperature: 0.7,
+        temperature: 0.4,
       }),
     })
 
@@ -649,7 +649,7 @@ async function callLLM(
     body: JSON.stringify({
       model: model || 'gpt-4o',
       messages,
-      temperature: 0.7,
+      temperature: 0.4,
       max_tokens: 1000,
     }),
   })

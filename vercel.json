@@ -1,5 +1,4 @@
 {
-  "rootDirectory": ".",
   "crons": [
     {
       "path": "/api/cron/process-followups",

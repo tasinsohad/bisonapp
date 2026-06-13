@@ -289,12 +289,19 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
           allThreadItems.map((msg: any, i: number) => {
             if (msg.isPending) {
               return (
-                <div key={`pending-${i}`} className="flex flex-col items-end">
-                  <div className="max-w-[85%] rounded-2xl p-4 shadow-sm bg-indigo-50 border border-indigo-200 border-dashed text-slate-800 rounded-tr-sm opacity-80">
-                    <div className="text-xs mb-2 pb-2 border-b font-medium flex justify-between items-center gap-4 border-indigo-100 text-indigo-500">
-                      <PendingStatusBadge status={msg.status} sendAfter={msg.timestamp} />
-                      
-                      <div className="flex items-center gap-2">
+                <div key={`pending-${i}`} className="flex flex-col w-full mb-4">
+                  <div className="w-full rounded-xl p-5 shadow-sm bg-indigo-50/40 border border-indigo-100 text-slate-800">
+                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-indigo-100/50">
+                      <div className="bg-indigo-100 p-1.5 rounded-lg text-indigo-600">
+                        <Bot className="w-4 h-4" />
+                      </div>
+                      <h4 className="font-semibold text-indigo-900 text-sm">
+                        {msg.type === 'ai_reply' ? 'AI Reply Draft' : 'Automated Sequence Draft'}
+                      </h4>
+                      <div className="ml-auto flex items-center gap-3">
+                        <PendingStatusBadge status={msg.status} sendAfter={msg.timestamp} />
+                        
+                        {/* Reschedule button Logic */}
                         {reschedulingItem?.id === msg.id && reschedulingItem?.type === msg.type ? (
                           <div className="flex items-center gap-1.5 bg-white rounded p-1 shadow-sm border border-indigo-100">
                             <input 
@@ -318,30 +325,24 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                             </button>
                           </div>
                         ) : (
-                          <>
-                            <span className="text-slate-400 text-[10px]">{format(new Date(msg.timestamp), 'MMM d, h:mm a')}</span>
-                            <button 
-                              onClick={() => {
-                                // Extract YYYY-MM-DDThh:mm string format for the datetime-local input using local time
-                                const d = new Date(msg.timestamp)
-                                const tzOffset = d.getTimezoneOffset() * 60000
-                                const localISOTime = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16)
-                                setReschedulingItem({ id: msg.id, type: msg.type, date: localISOTime })
-                              }}
-                              className="p-1 hover:bg-indigo-100 rounded text-indigo-400 hover:text-indigo-600 transition-colors"
-                              title="Reschedule"
-                            >
-                              <Calendar className="w-3.5 h-3.5" />
-                            </button>
-                          </>
+                          <button 
+                            onClick={() => {
+                              const d = new Date(msg.timestamp)
+                              const tzOffset = d.getTimezoneOffset() * 60000
+                              const localISOTime = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16)
+                              setReschedulingItem({ id: msg.id, type: msg.type, date: localISOTime })
+                            }}
+                            className="p-1.5 bg-white border border-indigo-100 hover:bg-indigo-50 rounded-md text-indigo-500 hover:text-indigo-700 transition-colors shadow-sm flex items-center gap-1.5 text-[10px] font-medium"
+                            title="Reschedule"
+                          >
+                            <Calendar className="w-3.5 h-3.5" />
+                            {format(new Date(msg.timestamp), 'MMM d, h:mm a')}
+                          </button>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center text-[10px] mb-2 uppercase tracking-wider text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full w-max mt-2">
-                      <Bot className="w-3 h-3 mr-1" /> {msg.type === 'ai_reply' ? 'AI Reply Queue' : 'Automated Sequence'}
-                    </div>
                     {editingDraft?.id === msg.id && editingDraft?.type === msg.type ? (
-                      <div className="mt-2 w-full text-left">
+                      <div className="w-full text-left">
                         <textarea 
                           value={editingDraft?.text || ''}
                           onChange={e => setEditingDraft(prev => prev ? {...prev, text: e.target.value} : null)}
@@ -356,13 +357,13 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                         </div>
                       </div>
                     ) : msg.hasDraft ? (
-                      <div className="text-sm leading-relaxed text-indigo-900 mt-2 relative group w-full text-left bg-white/50 rounded-lg p-3 border border-indigo-100">
+                      <div className="text-sm leading-relaxed text-slate-700 relative group w-full text-left bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
                         <div className="whitespace-pre-wrap">{msg.content}</div>
                         <button 
                           onClick={() => setEditingDraft({id: msg.id, type: msg.type, text: msg.content})}
-                          className="absolute -top-2.5 -right-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow hover:bg-indigo-50 font-medium"
+                          className="absolute -top-3 -right-3 bg-white text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1.5 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-indigo-50 font-medium flex items-center gap-1"
                         >
-                          Edit Draft
+                          <Edit2 className="w-3 h-3" /> Edit Draft
                         </button>
                       </div>
                     ) : (

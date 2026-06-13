@@ -109,6 +109,7 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
   const [rescheduling, setRescheduling] = useState(false)
   const [editingDraft, setEditingDraft] = useState<{id: string, type: string, text: string} | null>(null)
   const [savingDraft, setSavingDraft] = useState(false)
+  const [sendingDraft, setSendingDraft] = useState<string | null>(null)
   const [generatingDraft, setGeneratingDraft] = useState<string | null>(null)
   const { toast } = useToast()
 
@@ -224,6 +225,28 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
       toast(e.message, 'error')
     } finally {
       setSavingDraft(false)
+    }
+  }
+
+  const handleSendDraft = async (queueId: string) => {
+    setSendingDraft(queueId)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/send-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queueId })
+      })
+      if (res.ok) {
+        toast('Draft approved and sent successfully', 'success')
+        fetchLead()
+      } else {
+        const data = await res.json()
+        toast(data.error || 'Failed to send draft', 'error')
+      }
+    } catch(e: any) {
+      toast(e.message, 'error')
+    } finally {
+      setSendingDraft(null)
     }
   }
 
@@ -371,12 +394,23 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                     ) : msg.hasDraft ? (
                       <div className="text-sm leading-relaxed text-slate-700 relative group w-full text-left bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
                         <div className="whitespace-pre-wrap">{msg.content}</div>
-                        <button 
-                          onClick={() => setEditingDraft({id: msg.id, type: msg.type, text: msg.content})}
-                          className="absolute -top-3 -right-3 bg-white text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1.5 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-indigo-50 font-medium flex items-center gap-1"
-                        >
-                          <Edit2 className="w-3 h-3" /> Edit Draft
-                        </button>
+                        <div className="absolute -top-3 -right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => setEditingDraft({id: msg.id, type: msg.type, text: msg.content})}
+                            className="bg-white text-indigo-600 border border-indigo-200 rounded-md px-2.5 py-1.5 text-[10px] shadow-sm hover:bg-indigo-50 font-medium flex items-center gap-1"
+                          >
+                            <Edit2 className="w-3 h-3" /> Edit Draft
+                          </button>
+                          {msg.type === 'ai_reply' && msg.status === 'pending' && (
+                            <button 
+                              onClick={() => handleSendDraft(msg.id)}
+                              disabled={sendingDraft === msg.id}
+                              className="bg-indigo-600 text-white border border-indigo-700 rounded-md px-2.5 py-1.5 text-[10px] shadow-sm hover:bg-indigo-700 font-medium flex items-center gap-1 disabled:opacity-50"
+                            >
+                              <Send className="w-3 h-3" /> {sendingDraft === msg.id ? 'Sending...' : 'Approve & Send'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="mt-2 w-full text-left">

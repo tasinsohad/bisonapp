@@ -1,9 +1,105 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { useToast } from '@/components/shared/Toast'
-import { Send, Bot, RefreshCw, Clock, Calendar, Sparkles } from 'lucide-react'
+import { Send, Bot, RefreshCw, Clock, Calendar, Sparkles, Timer } from 'lucide-react'
+
+/**
+ * Live countdown hook — returns a formatted string like "3m 42s" or "Sending shortly..."
+ */
+function useCountdown(targetDate: string | null) {
+  const [timeLeft, setTimeLeft] = useState('')
+
+  useEffect(() => {
+    if (!targetDate) {
+      setTimeLeft('')
+      return
+    }
+
+    const update = () => {
+      const now = Date.now()
+      const target = new Date(targetDate).getTime()
+      const diff = target - now
+
+      if (diff <= 0) {
+        setTimeLeft('due')
+        return
+      }
+
+      const hours = Math.floor(diff / 3600000)
+      const minutes = Math.floor((diff % 3600000) / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+
+      if (hours > 24) {
+        const days = Math.floor(hours / 24)
+        setTimeLeft(`${days}d ${hours % 24}h`)
+      } else if (hours > 0) {
+        setTimeLeft(`${hours}h ${minutes}m`)
+      } else if (minutes > 0) {
+        setTimeLeft(`${minutes}m ${seconds}s`)
+      } else {
+        setTimeLeft(`${seconds}s`)
+      }
+    }
+
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [targetDate])
+
+  return timeLeft
+}
+
+/**
+ * Renders the status badge for a pending item with live countdown
+ */
+function PendingStatusBadge({ status, sendAfter }: { status: string; sendAfter: string }) {
+  const countdown = useCountdown(sendAfter)
+
+  if (status === 'drafting') {
+    return (
+      <span className="flex items-center gap-1.5 text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full text-xs font-medium">
+        <RefreshCw className="w-3 h-3 animate-spin" />
+        AI is generating draft...
+      </span>
+    )
+  }
+
+  if (status === 'processing') {
+    return (
+      <span className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full text-xs font-medium">
+        <Send className="w-3 h-3 animate-pulse" />
+        Sending now...
+      </span>
+    )
+  }
+
+  if (status === 'failed') {
+    return (
+      <span className="flex items-center gap-1.5 text-rose-600 bg-rose-50 px-2.5 py-1 rounded-full text-xs font-medium">
+        ❌ Failed — retry available
+      </span>
+    )
+  }
+
+  // pending status
+  if (countdown === 'due') {
+    return (
+      <span className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full text-xs font-medium">
+        <Send className="w-3 h-3 animate-pulse" />
+        Sending shortly...
+      </span>
+    )
+  }
+
+  return (
+    <span className="flex items-center gap-1.5 text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full text-xs font-medium tabular-nums">
+      <Timer className="w-3 h-3" />
+      Sending in {countdown}
+    </span>
+  )
+}
 
 export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: any }) {
   const [replyText, setReplyText] = useState('')
@@ -196,7 +292,7 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                 <div key={`pending-${i}`} className="flex flex-col items-end">
                   <div className="max-w-[85%] rounded-2xl p-4 shadow-sm bg-indigo-50 border border-indigo-200 border-dashed text-slate-800 rounded-tr-sm opacity-80">
                     <div className="text-xs mb-2 pb-2 border-b font-medium flex justify-between items-center gap-4 border-indigo-100 text-indigo-500">
-                      <span className="flex items-center"><Clock className="w-3 h-3 mr-1"/> Scheduled</span>
+                      <PendingStatusBadge status={msg.status} sendAfter={msg.timestamp} />
                       
                       <div className="flex items-center gap-2">
                         {reschedulingItem?.id === msg.id && reschedulingItem?.type === msg.type ? (
@@ -223,7 +319,7 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                           </div>
                         ) : (
                           <>
-                            <span>{format(new Date(msg.timestamp), 'MMM d, h:mm a')}</span>
+                            <span className="text-slate-400 text-[10px]">{format(new Date(msg.timestamp), 'MMM d, h:mm a')}</span>
                             <button 
                               onClick={() => {
                                 // Extract YYYY-MM-DDThh:mm string format for the datetime-local input using local time
@@ -243,9 +339,6 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                     </div>
                     <div className="flex items-center text-[10px] mb-2 uppercase tracking-wider text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full w-max mt-2">
                       <Bot className="w-3 h-3 mr-1" /> {msg.type === 'ai_reply' ? 'AI Reply Queue' : 'Automated Sequence'}
-                      <span className="ml-2 border-l border-indigo-200 pl-2">
-                        Status: <span className={`font-semibold ${msg.status === 'failed' ? 'text-rose-600' : ''}`}>{msg.status}</span>
-                      </span>
                     </div>
                     {editingDraft?.id === msg.id && editingDraft?.type === msg.type ? (
                       <div className="mt-2 w-full text-left">

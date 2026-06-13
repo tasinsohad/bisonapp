@@ -643,15 +643,23 @@ async function callLLM(
     endpoint = `${baseUrl}/chat/completions`
   }
 
+  // Build request body — add response_format for OpenAI to guarantee valid JSON
+  const requestBody: any = {
+    model: model || 'gpt-4o',
+    messages,
+    temperature: 0.4,
+    max_tokens: 1000,
+  }
+
+  // OpenAI supports response_format for guaranteed JSON output
+  if (provider === 'openai') {
+    requestBody.response_format = { type: 'json_object' }
+  }
+
   const response = await fetch(endpoint, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      model: model || 'gpt-4o',
-      messages,
-      temperature: 0.4,
-      max_tokens: 1000,
-    }),
+    body: JSON.stringify(requestBody),
   })
 
   if (!response.ok) {

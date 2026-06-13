@@ -1,0 +1,34 @@
+name: Process Followups Cron
+
+on:
+  schedule:
+    # Runs every 5 minutes
+    - cron: '*/5 * * * *'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  ping-cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Vercel Cron API
+        run: |
+          if [ -z "${{ secrets.APP_URL }}" ]; then
+            echo "Error: APP_URL secret is not set."
+            exit 1
+          fi
+          
+          # Remove trailing slash if present
+          URL=$(echo "${{ secrets.APP_URL }}" | sed 's:/*$::')
+          
+          echo "Pinging $URL/api/cron/process-followups"
+          
+          # Ping the API and print the HTTP status code
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "$URL/api/cron/process-followups")
+          
+          echo "Response Status: $STATUS"
+          
+          if [ "$STATUS" -ge 400 ]; then
+            echo "Cron request failed with status $STATUS"
+            exit 1
+          fi

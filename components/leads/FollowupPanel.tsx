@@ -67,7 +67,7 @@ export function FollowupPanel({ lead, fetchLead }: { lead: any, fetchLead: any }
   }, [supabase])
 
   const enrollments = lead.followup_enrollments || []
-  const activeEnrollment = enrollments.find((e: any) => e.status === 'active' || e.status === 'paused')
+  const activeEnrollment = enrollments.find((e: any) => ['active', 'paused', 'failed'].includes(e.status))
   const countdown = useCountdown(activeEnrollment?.next_send_at || null)
 
   const handleEnroll = async () => {

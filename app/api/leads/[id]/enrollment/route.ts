@@ -21,7 +21,7 @@ export async function PATCH(
     .from('followup_enrollments')
     .select('*, followup_sequences(steps)')
     .eq('lead_id', params.id)
-    .in('status', action === 'resume' ? ['paused'] : ['active'])
+    .in('status', action === 'resume' ? ['paused'] : ['active', 'paused', 'failed'])
     .single()
 
   if (!enrollment) {

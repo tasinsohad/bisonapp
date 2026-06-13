@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { useToast } from '@/components/shared/Toast'
-import { Play, Pause, XCircle, Plus, Clock, Timer, Bot, RefreshCw, Edit2 } from 'lucide-react'
+import { Play, Pause, XCircle, Plus, Clock, Timer, Bot, RefreshCw, Edit2, AlertTriangle } from 'lucide-react'
 
 /**
  * Live countdown hook
@@ -228,7 +228,17 @@ export function FollowupPanel({ lead, fetchLead }: { lead: any, fetchLead: any }
                 )}
               </div>
               
-              {activeEnrollment.draft_message ? (
+              {activeEnrollment.status === 'failed' ? (
+                <div className="text-sm leading-relaxed text-red-900 relative w-full text-left bg-red-50/50 rounded-lg p-4 border border-red-200 shadow-sm mt-2">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold block mb-1">AI Generation Failed</span>
+                      <span className="text-red-700">{activeEnrollment.error_message || 'An unknown error occurred while the AI was generating this message. Check your API keys and try again.'}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : activeEnrollment.draft_message ? (
                 <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-white p-4 rounded-lg border border-indigo-100 shadow-sm relative group">
                   {activeEnrollment.draft_message}
                 </div>

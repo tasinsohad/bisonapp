@@ -93,8 +93,15 @@ export async function POST(
         await adminSupabase.from('followup_enrollments').update({ draft_message: msg }).eq('id', enrollment.id)
         enrollment.draft_message = msg // update the returned object
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate initial draft:', error)
+      const adminSupabase = (await import('@/lib/supabase/server')).createAdminClient()
+      await adminSupabase.from('followup_enrollments').update({ 
+        status: 'failed',
+        error_message: error.message 
+      }).eq('id', enrollment.id)
+      enrollment.status = 'failed'
+      enrollment.error_message = error.message
     }
   }
 

@@ -210,6 +210,19 @@ export async function runAppointmentSetter(leadId: string, queueId?: string): Pr
       success: false,
       error_message: error.message,
     })
+    
+    if (queueId) {
+      await supabase.from('reply_queue').update({ status: 'failed', error_message: error.message }).eq('id', queueId)
+    }
+
+    await supabase.from('activity_feed').insert({
+      lead_id: leadId,
+      lead_email: lead.email,
+      lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
+      event_type: 'generation_failed',
+      description: `AI Appointment Setter failed: ${error.message}`,
+    })
+    
     return false
   }
 
@@ -228,8 +241,20 @@ export async function runAppointmentSetter(leadId: string, queueId?: string): Pr
   if (!parsedAction) {
     console.error('Failed to parse appointment setter response after retry')
     if (queueId) {
-      await supabase.from('reply_queue').update({ status: 'failed' }).eq('id', queueId)
+      await supabase.from('reply_queue').update({ 
+        status: 'failed',
+        error_message: 'Failed to parse JSON response from AI'
+      }).eq('id', queueId)
     }
+    
+    await supabase.from('activity_feed').insert({
+      lead_id: leadId,
+      lead_email: lead.email,
+      lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
+      event_type: 'generation_failed',
+      description: `AI Appointment Setter failed to parse JSON response`,
+    })
+    
     return false
   }
 
@@ -442,7 +467,10 @@ export async function executeDraftedQueueItem(queueId: string): Promise<boolean>
 
   if (queueError || !queueItem || !queueItem.leads || !queueItem.action_payload) {
     console.error('Failed to load queue item for execution:', queueError)
-    await supabase.from('reply_queue').update({ status: 'failed' }).eq('id', queueId)
+    await supabase.from('reply_queue').update({ 
+      status: 'failed',
+      error_message: queueError ? queueError.message : 'Missing queue payload'
+    }).eq('id', queueId)
     return false
   }
 
@@ -463,7 +491,10 @@ export async function executeDraftedQueueItem(queueId: string): Promise<boolean>
   if (success) {
     await supabase.from('reply_queue').update({ status: 'completed' }).eq('id', queueId)
   } else {
-    await supabase.from('reply_queue').update({ status: 'failed' }).eq('id', queueId)
+    await supabase.from('reply_queue').update({ 
+      status: 'failed',
+      error_message: 'Execution of agent action failed'
+    }).eq('id', queueId)
   }
 
   return success
@@ -565,7 +596,16 @@ export async function runFollowupAgent(
       success: false,
       error_message: error.message,
     })
-    return null
+    
+    await supabase.from('activity_feed').insert({
+      lead_id: lead.id,
+      lead_email: lead.email,
+      lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
+      event_type: 'generation_failed',
+      description: `Follow-up AI failed: ${error.message}`,
+    })
+    
+    throw error // Re-throw so callers can update followup_enrollments
   }
 }
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { useToast } from '@/components/shared/Toast'
-import { Send, Bot, RefreshCw, Clock, Calendar, Sparkles, Timer, Edit2 } from 'lucide-react'
+import { Send, Bot, RefreshCw, Clock, Calendar, Sparkles, Timer, Edit2, AlertTriangle } from 'lucide-react'
 
 /**
  * Live countdown hook — returns a formatted string like "3m 42s" or "Sending shortly..."
@@ -123,20 +123,22 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
       type: 'ai_reply',
       timestamp: q.send_after,
       content: q.draft_message || null,
+      error_message: q.error_message || null,
       hasDraft: !!q.draft_message,
       status: q.status
     }))
 
   // Pending Followup
-  const activeEnrollment = (lead.followup_enrollments || []).find((e: any) => e.status === 'active')
-  const pendingFollowups = activeEnrollment && activeEnrollment.next_send_at ? [{
+  const activeEnrollment = (lead.followup_enrollments || []).find((e: any) => ['active', 'failed', 'paused'].includes(e.status))
+  const pendingFollowups = activeEnrollment && (activeEnrollment.next_send_at || activeEnrollment.status === 'failed') ? [{
     isPending: true,
     id: activeEnrollment.id,
     type: 'followup',
-    timestamp: activeEnrollment.next_send_at,
+    timestamp: activeEnrollment.next_send_at || new Date().toISOString(),
     content: activeEnrollment.draft_message || null,
+    error_message: activeEnrollment.error_message || null,
     hasDraft: !!activeEnrollment.draft_message,
-    status: 'pending'
+    status: activeEnrollment.status
   }] : []
 
   // Combine and sort
@@ -341,7 +343,17 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                         )}
                       </div>
                     </div>
-                    {editingDraft?.id === msg.id && editingDraft?.type === msg.type ? (
+                    {msg.status === 'failed' ? (
+                      <div className="text-sm leading-relaxed text-red-900 relative w-full text-left bg-red-50/50 rounded-lg p-4 border border-red-200 shadow-sm mt-2">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-semibold block mb-1">AI Generation Failed</span>
+                            <span className="text-red-700">{msg.error_message || 'An unknown error occurred while the AI was generating this message. Check your API keys and try again.'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : editingDraft?.id === msg.id && editingDraft?.type === msg.type ? (
                       <div className="w-full text-left">
                         <textarea 
                           value={editingDraft?.text || ''}
@@ -368,8 +380,9 @@ export function ConversationThread({ lead, fetchLead }: { lead: any, fetchLead: 
                       </div>
                     ) : (
                       <div className="mt-2 w-full text-left">
-                        <div className="text-sm text-slate-500 italic mb-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          ⏳ No draft generated yet. Click below to generate the AI message.
+                        <div className="text-sm text-slate-500 italic mb-2 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+                          <RefreshCw className="w-4 h-4 animate-spin text-amber-500" />
+                          <span>AI is generating draft...</span>
                         </div>
                         <button
                           onClick={() => handleGenerateDraft(msg.id, msg.type)}

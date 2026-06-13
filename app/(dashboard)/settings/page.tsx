@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings as SettingsIcon, Mail, Bot, Calendar, MessageSquare, Clock, Webhook, Shield } from 'lucide-react'
+import { Settings as SettingsIcon, Mail, Bot, Calendar, MessageSquare, Clock, Webhook, Shield, AlertTriangle } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
 import { useWorkspace } from '@/components/providers/WorkspaceProvider'
 
@@ -12,6 +12,7 @@ import { PromptsSettings } from '@/components/settings/PromptsSettings'
 import { FollowupDefaults } from '@/components/settings/FollowupDefaults'
 import { WebhookSettings } from '@/components/settings/WebhookSettings'
 import { GeneralSettings } from '@/components/settings/GeneralSettings'
+import { SystemLogs } from '@/components/settings/SystemLogs'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('bison')
@@ -62,6 +63,7 @@ export default function SettingsPage() {
     { id: 'prompts', label: 'Prompts', icon: MessageSquare },
     { id: 'followup', label: 'Follow-ups', icon: Clock },
     { id: 'webhooks', label: 'Webhooks', icon: Webhook },
+    { id: 'logs', label: 'System Logs', icon: AlertTriangle },
     { id: 'general', label: 'General', icon: Shield },
   ]
 
@@ -117,6 +119,7 @@ export default function SettingsPage() {
             {activeTab === 'prompts' && <PromptsSettings settings={settings} setSettings={setSettings} onSave={handleSave} />}
             {activeTab === 'followup' && <FollowupDefaults settings={settings} setSettings={setSettings} onSave={handleSave} />}
             {activeTab === 'webhooks' && <WebhookSettings settings={settings} setSettings={setSettings} onSave={handleSave} />}
+            {activeTab === 'logs' && <SystemLogs />}
             {activeTab === 'general' && <GeneralSettings settings={settings} setSettings={setSettings} onSave={handleSave} />}
           </div>
         </div>

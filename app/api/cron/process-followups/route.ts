@@ -175,8 +175,12 @@ async function processCron(request: NextRequest) {
         } else {
           await supabase.from('followup_enrollments').update({ status: 'completed' }).eq('id', enrollment.id)
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to generate draft', e)
+        await supabase.from('followup_enrollments').update({ 
+          status: 'failed', 
+          error_message: e.message 
+        }).eq('id', enrollment.id)
       }
     }
   }
@@ -337,20 +341,26 @@ async function processCron(request: NextRequest) {
       let newStatus = 'active'
       let newNextSendAt = null
       let newDraftMessage = null
+      let newErrorMessage = null
 
       if (nextStepConfig) {
         newNextSendAt = calculateNextSendAt(nextStepConfig, timezone, windowStart, windowEnd).toISOString()
         // Generate draft for the next step immediately
-        const nextMessage = await runFollowupAgent(
-          lead,
-          enrollment.current_step + 1,
-          steps.length,
-          nextStepConfig.custom_message
-        )
-        if (nextMessage) {
-          newDraftMessage = nextMessage
-        } else {
-          newStatus = 'completed' // AI said done
+        try {
+          const nextMessage = await runFollowupAgent(
+            lead,
+            enrollment.current_step + 1,
+            steps.length,
+            nextStepConfig.custom_message
+          )
+          if (nextMessage) {
+            newDraftMessage = nextMessage
+          } else {
+            newStatus = 'completed' // AI said done
+          }
+        } catch (e: any) {
+          newStatus = 'failed'
+          newErrorMessage = e.message
         }
       } else {
         newStatus = 'completed'
@@ -361,6 +371,7 @@ async function processCron(request: NextRequest) {
         status: newStatus,
         next_send_at: newNextSendAt,
         draft_message: newDraftMessage,
+        error_message: newErrorMessage,
         updated_at: new Date().toISOString()
       }).eq('id', enrollment.id)
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow, format } from 'date-fns'
-import { MessageSquare, UserPlus, Send, CalendarCheck, Clock, FileEdit, AlertCircle } from 'lucide-react'
+import { MessageSquare, UserPlus, Send, CalendarCheck, Clock, FileEdit, AlertCircle, XCircle } from 'lucide-react'
 
 export function ActivityLog({ lead }: { lead: any }) {
   const [activities, setActivities] = useState<any[]>([])
@@ -32,6 +32,7 @@ export function ActivityLog({ lead }: { lead: any }) {
       case 'followup_enrolled': return <Clock className="w-4 h-4 text-amber-500" />
       case 'status_changed': return <FileEdit className="w-4 h-4 text-slate-500" />
       case 'agent_decision': return <AlertCircle className="w-4 h-4 text-purple-500" />
+      case 'generation_failed': return <XCircle className="w-4 h-4 text-red-500" />
       default: return <div className="w-2 h-2 rounded-full bg-slate-300" />
     }
   }

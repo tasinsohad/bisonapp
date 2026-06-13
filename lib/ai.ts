@@ -258,29 +258,31 @@ export async function runAppointmentSetter(leadId: string, queueId?: string): Pr
     return false
   }
 
-  // If a queueId is provided, we save the draft and stop here.
-  // Exception: If the action is DONE, we can just execute it immediately to cancel follow-ups
-  // and mark the lead as done, since no email is being sent anyway.
+  // Automatically send the draft immediately since the user wants full automation
   if (queueId && parsedAction.action !== 'DONE') {
+    // 1. Update queue to processing
     await supabase.from('reply_queue').update({
-      status: 'pending',
+      status: 'processing',
       draft_message: parsedAction.message,
       action_payload: parsedAction
     }).eq('id', queueId)
     
-    // Also notify activity feed that draft is ready
-    await supabase.from('activity_feed').insert({
-      lead_id: leadId,
-      lead_email: lead.email,
-      lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
-      event_type: 'status_changed',
-      description: `AI draft generated and pending review/send.`,
-    })
-
-    return true
+    // 2. Execute the action (Send email)
+    const success = await executeAgentAction(supabase, settings, leadId, lead, parsedAction, parsedAction.message, queueId)
+    
+    // 3. Mark completed or failed
+    if (success) {
+      await supabase.from('reply_queue').update({ status: 'completed' }).eq('id', queueId)
+    } else {
+      await supabase.from('reply_queue').update({ 
+        status: 'failed',
+        error_message: 'Failed to send automated email'
+      }).eq('id', queueId)
+    }
+    return success
   }
 
-  // Execute the action (Immediate Send)
+  // Execute the action (Immediate Send if no queueId)
   return await executeAgentAction(supabase, settings, leadId, lead, parsedAction, parsedAction.message, queueId)
 }
 

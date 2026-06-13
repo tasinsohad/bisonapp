@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { useToast } from '@/components/shared/Toast'
-import { Send, Bot, RefreshCw, Clock, Calendar, Sparkles, Timer } from 'lucide-react'
+import { Send, Bot, RefreshCw, Clock, Calendar, Sparkles, Timer, Edit2 } from 'lucide-react'
 
 /**
  * Live countdown hook — returns a formatted string like "3m 42s" or "Sending shortly..."

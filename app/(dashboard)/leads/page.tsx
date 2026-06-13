@@ -7,6 +7,7 @@ import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import { Search, Filter, Download, Plus, ChevronLeft, ChevronRight, Trash2, X, Users } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
+import { createClient } from '@/lib/supabase/client'
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<any[]>([])
@@ -81,6 +82,27 @@ export default function LeadsPage() {
 
     return () => clearTimeout(delayDebounceFn)
   }, [search, statusFilter, page])
+
+  useEffect(() => {
+    const supabase = createClient()
+    
+    // Subscribe to any changes on the leads table
+    const channel = supabase.channel('leads-list-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leads' },
+        (payload) => {
+          console.log('Realtime leads update received!', payload)
+          // Refetch leads to ensure pagination and sorting are respected
+          fetchLeads()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [page, search, statusFilter]) // re-subscribe with current filters if needed, or rely on fetchLeads closure
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto h-full flex flex-col">

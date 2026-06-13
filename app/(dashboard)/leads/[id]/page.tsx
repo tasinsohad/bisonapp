@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useToast } from '@/components/shared/Toast'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { BisonSenderChip } from '@/components/shared/BisonSenderChip'
+import { createClient } from '@/lib/supabase/client'
 
 // Tabs
 import { LeadOverview } from '@/components/leads/LeadOverview'
@@ -51,6 +52,45 @@ export default function LeadDetailPage() {
 
   useEffect(() => {
     fetchLead()
+  }, [id])
+
+  useEffect(() => {
+    if (!id) return;
+    
+    const supabase = createClient()
+    
+    // Subscribe to all relevant tables for this specific lead
+    const channel = supabase.channel(`lead-detail-${id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leads', filter: `id=eq.${id}` },
+        () => fetchLead()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'conversations', filter: `lead_id=eq.${id}` },
+        () => fetchLead()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reply_queue', filter: `lead_id=eq.${id}` },
+        () => fetchLead()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'activity_feed', filter: `lead_id=eq.${id}` },
+        () => fetchLead()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'followup_enrollments', filter: `lead_id=eq.${id}` },
+        () => fetchLead()
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [id])
 
   if (loading) {

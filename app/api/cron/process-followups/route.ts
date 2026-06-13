@@ -34,14 +34,49 @@ async function processCron(request: NextRequest) {
 
   // ──────────────────────────────────────────────────────────────
   // STEP 0: PROACTIVE REPLY CHECK via Bison API
-  //
-  // Before processing any follow-ups, poll the Bison API for all
-  // leads with active enrollments to detect replies that may have
-  // been missed by the webhook. If a reply is found:
-  //   → Pause the enrollment
-  //   → Queue the reply for AI processing
-  // This ensures no follow-up is sent to a lead who already replied.
   // ──────────────────────────────────────────────────────────────
+  
+  const pollLead = async (lead: any) => {
+    try {
+      const syncResult = await syncLeadThread(lead)
+      if (syncResult.success && syncResult.hasNewReply) {
+        // Check if there's already a pending/drafting queue item for this lead
+        const { data: existingQueue } = await supabase
+          .from('reply_queue')
+          .select('id')
+          .eq('lead_id', lead.id)
+          .in('status', ['drafting', 'pending', 'processing'])
+          .maybeSingle()
+
+        if (!existingQueue) {
+          const delayMinutes = parseInt(settings.inbound_reply_delay_minutes || '5')
+          const sendAfter = new Date(Date.now() + delayMinutes * 60000).toISOString()
+          const { data: queue } = await supabase.from('reply_queue').insert({
+            lead_id: lead.id,
+            status: 'drafting',
+            send_after: sendAfter
+          }).select('id').single()
+
+          await supabase.from('activity_feed').insert({
+            lead_id: lead.id,
+            lead_email: lead.email,
+            lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
+            event_type: 'reply_received',
+            description: `Reply discovered via API poll (missed webhook). AI reply queued.`,
+            metadata: { source: 'cron_poll' },
+          })
+
+          if (queue) {
+            runAppointmentSetter(lead.id, queue.id).catch(console.error)
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[Reply Check] Failed for lead ${lead.id}:`, err)
+    }
+  }
+
+  // Set 1: Leads with active enrollments
   const { data: activeEnrollments } = await supabase
     .from('followup_enrollments')
     .select('id, lead_id, enrolled_at, current_step, leads(*)')
@@ -53,54 +88,104 @@ async function processCron(request: NextRequest) {
       if (Date.now() - startTime > MAX_EXECUTION_TIME) break
       const lead = enrollment.leads as any
       if (!lead || !lead.bison_reply_id) continue
+      await pollLead(lead)
+    }
+  }
 
-      try {
-        // Call Bison API to sync the full thread and detect new replies
-        const syncResult = await syncLeadThread(lead)
+  // Set 2: Engaged leads not synced in 30 minutes
+  const thirtyMinsAgo = new Date(Date.now() - 30 * 60000).toISOString()
+  const { data: engagedLeads } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('status', 'engaged')
+    .not('bison_reply_id', 'is', null)
+    .lte('last_synced_at', thirtyMinsAgo)
+    .limit(30)
+
+  if (engagedLeads && engagedLeads.length > 0) {
+    for (const lead of engagedLeads) {
+      if (Date.now() - startTime > MAX_EXECUTION_TIME) break
+      await pollLead(lead)
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // STEP 0.1: AUTO-ENROLL UNRESPONSIVE LEADS
+  // ──────────────────────────────────────────────────────────────
+  const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60000).toISOString()
+  
+  // Find leads that are engaged and have no active followups
+  const { data: unresponsiveCandidates } = await supabase
+    .from('leads')
+    .select(`
+      *,
+      conversations ( messages ),
+      followup_enrollments ( status )
+    `)
+    .eq('status', 'engaged')
+    .limit(50)
+
+  if (unresponsiveCandidates && unresponsiveCandidates.length > 0) {
+    // Get default sequence id
+    const { data: defaultSeq } = await supabase.from('followup_sequences').select('id, steps').order('created_at', { ascending: true }).limit(1).maybeSingle()
+    
+    if (defaultSeq && defaultSeq.steps && (defaultSeq.steps as any[]).length > 0) {
+      for (const lead of unresponsiveCandidates) {
+        if (Date.now() - startTime > MAX_EXECUTION_TIME) break
         
-        if (syncResult.success && syncResult.hasNewReply) {
-          // syncLeadThread already pauses the enrollment when auto_pause_on_reply is on,
-          // syncs conversation messages, and updates the lead's bison_reply_id.
-          // Now we also need to queue this newly discovered reply for AI processing
-          // so the appointment setter can respond.
+        // Skip if currently has an active, failed, or paused enrollment
+        const hasActiveEnrollment = lead.followup_enrollments?.some((e: any) => ['active', 'paused', 'failed'].includes(e.status))
+        if (hasActiveEnrollment) continue
 
-          // Check if there's already a pending/drafting queue item for this lead
-          const { data: existingQueue } = await supabase
-            .from('reply_queue')
-            .select('id')
-            .eq('lead_id', lead.id)
-            .in('status', ['drafting', 'pending', 'processing'])
-            .maybeSingle()
+        // Check last message in conversation
+        if (lead.conversations && lead.conversations.length > 0) {
+          const messages = lead.conversations[0].messages || []
+          if (messages.length > 0) {
+            const lastMessage = messages[messages.length - 1]
+            // If last message was outbound and older than 2 days
+            if (lastMessage.role === 'outbound' && new Date(lastMessage.timestamp).getTime() < new Date(twoDaysAgo).getTime()) {
+              // Enroll them
+              const timezone = settings.app_timezone || 'America/New_York'
+              const windowStart = parseInt(settings.send_window_start || '9')
+              const windowEnd = parseInt(settings.send_window_end || '18')
+              
+              const step1 = (defaultSeq.steps as any[])[0]
+              const nextSendAt = calculateNextSendAt(step1, timezone, windowStart, windowEnd)
 
-          if (!existingQueue) {
-            const delayMinutes = parseInt(settings.inbound_reply_delay_minutes || '5')
-            const sendAfter = new Date(Date.now() + delayMinutes * 60000).toISOString()
+              const { data: newEnrollment } = await supabase
+                .from('followup_enrollments')
+                .insert({
+                  lead_id: lead.id,
+                  sequence_id: defaultSeq.id,
+                  current_step: 1,
+                  status: 'active',
+                  next_send_at: nextSendAt.toISOString()
+                })
+                .select()
+                .single()
 
-            const { data: queue } = await supabase.from('reply_queue').insert({
-              lead_id: lead.id,
-              status: 'drafting',
-              send_after: sendAfter
-            }).select('id').single()
+              if (newEnrollment) {
+                await supabase.from('activity_feed').insert({
+                  lead_id: lead.id,
+                  lead_email: lead.email,
+                  lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
+                  event_type: 'followup_enrolled',
+                  description: 'Automatically enrolled in follow-up sequence after 48h of inactivity',
+                  metadata: { source: 'auto_enrollment' }
+                })
 
-            await supabase.from('activity_feed').insert({
-              lead_id: lead.id,
-              lead_email: lead.email,
-              lead_name: [lead.first_name, lead.last_name].filter(Boolean).join(' '),
-              event_type: 'reply_received',
-              description: `Reply discovered via API poll (missed webhook). AI reply queued.`,
-              metadata: { source: 'cron_poll' },
-            })
-
-            // Kick off AI draft generation
-            if (queue) {
-              runAppointmentSetter(lead.id, queue.id).catch(console.error)
+                // Gen draft
+                runFollowupAgent(lead, 1, (defaultSeq.steps as any[]).length, step1.custom_message).then(async (msg) => {
+                  if (msg) {
+                    await supabase.from('followup_enrollments').update({ draft_message: msg }).eq('id', newEnrollment.id)
+                  }
+                }).catch(async (err) => {
+                  await supabase.from('followup_enrollments').update({ status: 'failed', error_message: err.message }).eq('id', newEnrollment.id)
+                })
+              }
             }
           }
-
-          console.log(`[Reply Check] Lead ${lead.email}: reply found via API poll, enrollment paused`)
         }
-      } catch (err) {
-        console.error(`[Reply Check] Failed for lead ${lead.id}:`, err)
       }
     }
   }

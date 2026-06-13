@@ -205,6 +205,7 @@ export async function syncLeadThread(lead: Lead): Promise<{ success: boolean; ha
           status: lead.status === 'new' ? 'engaged' : lead.status, // Move 'new' to 'engaged'
           last_activity_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          last_synced_at: new Date().toISOString(),
         })
         .eq('id', lead.id)
     } else if (newlyDiscoveredMessagesCount > 0) {
@@ -215,6 +216,15 @@ export async function syncLeadThread(lead: Lead): Promise<{ success: boolean; ha
           bison_reply_id: updatedReplyId,
           last_activity_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          last_synced_at: new Date().toISOString(),
+        })
+        .eq('id', lead.id)
+    } else {
+      // Always update last_synced_at even if no new messages
+      await supabase
+        .from('leads')
+        .update({
+          last_synced_at: new Date().toISOString(),
         })
         .eq('id', lead.id)
     }

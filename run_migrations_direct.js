@@ -15,9 +15,9 @@ async function runMigrations() {
     await client.connect();
     console.log("✅ Connected to Supabase PostgreSQL database");
 
-    const migrationPath = path.join(__dirname, 'supabase', 'migrations', '005_add_error_messages.sql');
+    const migrationPath = path.join(__dirname, 'supabase', 'migrations', '006_add_last_synced_at.sql');
     const sql = fs.readFileSync(migrationPath, 'utf8');
-    console.log("⏳ Running 005 migration...");
+    console.log("⏳ Running 006 migration...");
     await client.query(sql);
     console.log("✅ Successfully ran migration");
 
